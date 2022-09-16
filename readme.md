@@ -2,8 +2,8 @@
 
 基于ayaka开发的文字小游戏合集
 
-- incan 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
-- bet 赌大小
+- 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
+- 赌大小
 - 原神接龙
 - 成语接龙
 - 祈祷nia
