@@ -2,6 +2,10 @@
 
 基于ayaka开发的文字小游戏合集
 
+- incan 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
+- bet 赌大小
+- 
+
 ## How to start
 
 首先需要安装 ayaka插件 `poetry add nonebot-plugin-ayaka`
