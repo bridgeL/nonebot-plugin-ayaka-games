@@ -4,7 +4,11 @@
 
 - incan 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
 - bet 赌大小
-- 
+- 原神接龙
+- 成语接龙
+- 祈祷nia
+
+<b>注意：由于更新pypi的readme.md需要占用版本号，因此其readme.md可能不是最新的，强烈建议读者前往[github仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)以获取最新版本的帮助</b>
 
 ## How to start
 
