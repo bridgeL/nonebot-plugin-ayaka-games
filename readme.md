@@ -7,6 +7,7 @@
 - 原神接龙
 - 成语接龙
 - 祈祷nia
+- 背包
 
 <b>注意：由于更新pypi的readme.md需要占用版本号，因此其readme.md可能不是最新的，强烈建议读者前往[github仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)以获取最新版本的帮助</b>
 
@@ -14,6 +15,7 @@
 
 <details>
 <summary>更新记录</summary>
+
 版本 | 备注
 -|-
 0.0.4 | 修复了单个插件错误导致其他插件无法导入的问题
