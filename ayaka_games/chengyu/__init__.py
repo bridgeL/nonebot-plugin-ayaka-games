@@ -7,7 +7,7 @@ from ..bag import add_money
 from ..utils.name import get_name, get_uid_name
 from ..utils.file import LocalPath
 
-app = AyakaApp("成语接龙")
+app = AyakaApp("成语接龙", only_group=True)
 app.help = "成语接龙（肯定是你输\n[#cy <参数>] 查询成语\n[什么是 <参数>] 查询成语\n[<参数> 是什么] 查询成语\n[#成语统计] 查询历史记录"
 
 path = LocalPath(__file__)
