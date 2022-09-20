@@ -26,6 +26,6 @@ async def checkin():
     sa.set(date)
 
     # 签到奖励 
-    money = add_money(100, app.device, app.event.user_id)
-    await app.send(f"[{name}] 签到成功，系统奖励 200000金")
+    money = add_money(10000, app.device, app.event.user_id)
+    await app.send(f"[{name}] 签到成功，系统奖励 10000金")
     await app.send(f"[{name}] 当前拥有 {money}金")
