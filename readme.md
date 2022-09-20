@@ -1,6 +1,6 @@
 # ayaka衍生插件 v0.0.5
 
-基于ayaka开发的文字小游戏合集
+基于ayaka开发的文字小游戏合集（共计10个）
 
 ## 基础插件
 提供金钱管理功能，让游戏更有目的性
@@ -8,13 +8,13 @@
 - 签到
 
 ## 文字游戏插件
-- 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
-- 原神接龙
-- 成语接龙
-- 赌大小
-- 祈祷nia
-- 发癫生成器
-- bingo~
+1. 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
+2. 原神接龙
+3. 成语接龙
+4. 赌大小
+5. 祈祷nia
+6. 发癫生成器
+7. bingo~
 
 <b>注意：由于更新pypi的readme.md需要占用版本号，因此其readme.md可能不是最新的，强烈建议读者前往[github仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)以获取最新版本的帮助</b>
 
