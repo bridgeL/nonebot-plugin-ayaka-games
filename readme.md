@@ -2,13 +2,17 @@
 
 基于ayaka开发的文字小游戏合集
 
-- 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
-- 赌大小
-- 原神接龙
-- 成语接龙
-- 祈祷nia
+## 基础插件
+提供金钱管理功能，让游戏更有目的性
 - 背包
 - 签到
+
+## 文字游戏插件
+- 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
+- 原神接龙
+- 成语接龙
+- 赌大小
+- 祈祷nia
 - 发癫生成器
 - bingo~
 
