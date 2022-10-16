@@ -2,6 +2,8 @@
 
 基于ayaka开发的文字小游戏合集（共计10个）
 
+任何问题请发issue
+
 <b>注意：由于更新pypi的readme.md需要占用版本号，因此其readme.md可能不是最新的，强烈建议读者前往[github仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)以获取最新版本的帮助</b>
 
 
