@@ -30,7 +30,7 @@
 
 </details>
 
-## How to start
+# How to start
 
 ## 安装 ayaka
 
@@ -51,10 +51,10 @@ nonebot.load_plugin("ayaka_games")
 
 将[本仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)的data文件夹，放到nonebot的工作目录下
 
-## Documentation
+# Documentation
 
 前置插件 [nonebot-plugin-ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)
 
-## 特别感谢
+# 特别感谢
 
 [@灯夜](https://github.com/lunexnocty/Meiri) 大佬的插件蛮好玩的~
