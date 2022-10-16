@@ -47,7 +47,7 @@
 nonebot.load_plugin("ayaka_games")
 ```
 
-### 导入数据
+## 导入数据
 
 将[本仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)的data文件夹，放到nonebot的工作目录下
 
