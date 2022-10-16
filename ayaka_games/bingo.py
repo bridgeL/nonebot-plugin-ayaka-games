@@ -3,12 +3,14 @@ bingo 小游戏
 '''
 from random import randint, seed
 from time import time
-from .utils.name import get_name
-from .bag import add_money
+from .bag import change_money
 from ayaka import *
 
-app = AyakaApp("bingo", only_group=True)
-app.help = "[#b 数字] 花费100金打开一张卡，当卡片练成一整行、一整列或一整条对角线时，获得200*n金的奖励\n[#bb 数字] 免费生成一张新的bingo表，默认大小为n=4"
+app = AyakaApp("bingo")
+app.help = '''经典小游戏
+- b <数字> 花费100金打开一张卡，当卡片练成一整行、一整列或一整条对角线时，获得200*n金的奖励
+- bb <数字> 免费生成一张新的bingo表，默认大小为4
+'''
 
 seed(time())
 
@@ -25,42 +27,50 @@ class Bingo:
         self.ok = False
         i = 0
         while True:
-            if not self.check_available():
-                self.data[i] = 1
+            paths = self.get_win_paths()
+            if len(paths) == 1:
                 break
 
+            # 回退上一操作
+            if not paths:
+                self.data[i] = 1
+
             i = randint(0, n*n-1)
+            while not self.data[i]:
+                i = randint(0, n*n-1)
+
             self.data[i] = 0
 
-    def get_win_path(self):
+    def get_win_paths(self):
         n = self.n
+
+        paths = []
 
         # 行
         for i in range(n):
             path = [i*n+j for j in range(n)]
             if all(self.data[k] for k in path):
-                return path
+                paths.append(path)
 
         # 列
         for i in range(n):
             path = [j*n+i for j in range(n)]
             if all(self.data[k] for k in path):
-                return path
+                paths.append(path)
 
         # 对角
         path = [i*n+i for i in range(n)]
         if all(self.data[k] for k in path):
-            return path
+            paths.append(path)
 
         path = [i*n+n-i-1 for i in range(n)]
         if all(self.data[k] for k in path):
-            return path
+            paths.append(path)
 
-    def check_available(self):
-        return self.get_win_path()
+        return paths
 
     def check_win(self):
-        path = self.get_win_path()
+        path = self.get_win_paths()[0]
         return all(self.opened[k] for k in path)
 
     def get_all_info(self):
@@ -115,7 +125,7 @@ class Bingo:
 @ app.on_command("bb")
 async def handle():
     try:
-        n = int(app.args[0])
+        n = int(str(app.args[0]))
         if n < 3 or n > 6:
             raise
     except:
@@ -130,6 +140,7 @@ async def handle():
         bingo.n = n
         bingo.build()
     await app.send(bingo.get_info())
+    # await app.send(bingo.get_all_info())
 
 
 @ app.on_command(["bingo", "b"])
@@ -142,11 +153,11 @@ async def handle():
 
     if not app.args:
         await app.send(bingo.get_info())
-        await app.send_help()
+        await app.send(app.help)
         return
 
     try:
-        n = int(app.args[0])
+        n = int(str(app.args[0]))
     except:
         await app.send("参数错误")
         return
@@ -156,12 +167,11 @@ async def handle():
         await app.send(info)
         return
 
-    name = get_name(app.event)
-    money = add_money(-100, app.device, app.event.user_id)
+    money = change_money(-100, app.user_id)
     if bingo.ok:
-        money = add_money(bingo.n*200, app.device, app.event.user_id)
-        await app.send(f"[{name}] 赢了，奖励 {bingo.n*200}金，当前拥有 {money}金")
+        money = change_money(bingo.n*200, app.user_id)
+        await app.send(f"[{app.user_name}] 赢了，奖励 {bingo.n*200}金，当前拥有 {money}金")
         await app.send(bingo.get_all_info())
     else:
-        await app.send(f"[{name}] 花费100金翻开了{n}号： {info}")
+        await app.send(f"[{app.user_name}] 花费100金翻开了{n}号： {info}")
         await app.send(bingo.get_info())

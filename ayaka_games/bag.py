@@ -1,53 +1,90 @@
+from ayaka import AyakaApp, MessageSegment
+
+app = AyakaApp("bag")
+app.help = '''背包（只是个存钱罐）
+- 背包/bag
 '''
-    背包
-'''
-from ayaka import *
-from .utils.name import get_name, get_uid_name
-
-app = AyakaApp('bag', only_group=True)
-app.help = "背包"
 
 
-@app.on_command(['bag', '背包'], super=True)
-async def bag():
-    # 如果附带参数，则查询指定人
-    if len(app.args) >= 1:
-        uid, name = await get_uid_name(app.bot, app.event, app.args[0])
-        if not uid:
-            await app.send("查无此人")
+async def show_money(uid: int, uname: str):
+    money = inquire_money(uid)
+    await app.send(f"[{uname}] 当前持有 {money}金")
+
+
+@app.on_command(["背包", "bag"], super=True)
+async def _():
+    if not app.args:
+        await show_money(app.user_id, app.user_name)
+        return
+
+    user = await get_user(app.args[0])
+
+    if not user:
+        await app.send("查无此人")
+        return
+    await show_money(user["user_id"], user["card"] or user["nickname"])
+
+
+async def get_user(name_or_uid_or_at):
+    '''通过name、at、uid中的任意一项获取user，若uid不在群内，返回None'''
+    users = await app.bot.get_group_member_list(group_id=app.group_id)
+
+    if isinstance(name_or_uid_or_at, MessageSegment) and name_or_uid_or_at.type == "at":
+        at = name_or_uid_or_at
+        try:
+            uid = int(at.data["qq"])
+        except:
             return
 
-    # 否则查询自己
-    else:
-        uid = app.event.user_id
-        name = get_name(app.event)
+        for user in users:
+            if user["user_id"] == uid:
+                return user
+        return
 
-    money = get_money(app.device, uid)
+    # 名称？
+    name = name_or_uid_or_at = str(name_or_uid_or_at)
+    if name.startswith("@"):
+        name = name[1:]
 
-    ans = f"[{name}] 当前有 {money}金"
-    await app.send(ans)
+    # 群名片？
+    for user in users:
+        if user["card"] == name:
+            return user
+
+    # QQ昵称？
+    for user in users:
+        if user["nickname"] == name:
+            return user
+
+    # QQ号？
+    try:
+        uid = int(name_or_uid_or_at)
+    except:
+        return
+
+    for user in users:
+        if user["user_id"] == uid:
+            return user
 
 
-def get_money(device: AyakaDevice, uid: int) -> int:
-    _app = device.get_app(app.name)
-    sa = _app.storage.accessor(uid, "money")
-    money = sa.get()
-    if money is None:
-        # 初始100金
-        sa.set(100)
-        return 100
-    return money
+def inquire_money(uid: int):
+    bag_file = app.group_storage(uid, default={})
+    bag_data = bag_file.load()
+    if "money" not in bag_data:
+        bag_data["money"] = 1000
+        bag_file.save(bag_data)
+    return bag_data["money"]
 
 
-def add_money(diff: int, device: AyakaDevice, uid: int) -> int:
-    _app = device.get_app(app.name)
-    sa = _app.storage.accessor(uid, "money")
-    money = sa.get()
-    if money is None:
-        # 初始100金
-        money = 100 + diff
-        sa.set(money)
-    else:
-        money += diff
-        sa.set(money)
-    return money
+def change_money(diff: int, uid: int):
+    if diff == 0:
+        return
+
+    bag_file = app.group_storage(uid, default={})
+    bag_data = bag_file.load()
+    if "money" not in bag_data:
+        bag_data["money"] = 1000
+
+    bag_data["money"] += diff
+    bag_file.save(bag_data)
+    return bag_data["money"]

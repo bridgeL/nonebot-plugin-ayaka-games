@@ -1,6 +1,24 @@
-from .model import Incan, Card, choice, Deck
-from .app import app
-from .quit import exit_incan
+from typing import List
+from enum import Enum
+from random import randint, choice, shuffle
+from ayaka import AyakaApp
+app = AyakaApp("incan")
+
+app.help = '''指令列表: 
+[start/run] 开始游戏
+[join] 加入游戏
+[status] 查看状态
+[go/back] 前进/撤退
+[rule/doc] 查看规则
+[exit/quit] 退出'''
+
+ruledoc = '''1. 前进，玩家翻开一张卡牌
+2. 撤退，玩家沿着来时的路径原路返回
+3. 遇到宝石，玩家平分宝石，剩余的宝石留在原地
+4. 遇到遗物，当且仅当一名玩家撤退时可从卡片上获得遗物
+5. 在前进时遇到怪物，第二次遇到将被驱逐出神殿，丢失此轮在神殿中获得的一切收益
+6. 前两个被带出的遗物计5分，后3个被带出的遗物计10分'''
+
 
 warnings = [
     '人类，离开此地！',
@@ -34,6 +52,130 @@ deads = [
     '该说是有勇气呢还是无谋呢还是说盲目自信呢……不是很懂你们这些人类。'
     '不要放弃，下次更加谨慎一点吧！'
 ]
+
+greeting = '''欢迎使用印加宝藏2.0
+输入[join]加入游戏
+输入[start/run]开始游戏
+输入[help]可以查看指令列表
+输入[rule/doc查看游戏规则
+如果在游戏过程中有什么问题或建议，请@灯夜(2692327749)'''
+
+treasures = {
+    'Turquoise': {
+        'number': 0,
+        'value': 1
+    },
+    'Obsidian': {
+        'number': 0,
+        'value': 5
+    },
+    'Gold': {
+        'number': 0,
+        'value': 10
+    },
+    'Artifact': {
+        'number': 0,
+        'value': 5
+    }
+}
+
+
+class Incan:
+    def __init__(self):
+        self.members = {}
+        self.round = 0
+        self.route: List[Card] = []
+        self.deck = Deck()
+        self.monsters = []
+        self.artifact = 0
+        self.acquiredArtifact = 0
+        self.turn = 0
+        self.temples = Deck('Temple')
+
+
+class Card:
+    class Type(Enum):
+        TEMPLE = 0,
+        JEWEL = 1,
+        MONSTER = 2,
+        ARTIFACT = 3
+
+        def ToString(self):
+            if self is self.TEMPLE:
+                return 'Temple'
+            elif self is self.JEWEL:
+                return 'Jewel'
+            elif self is self.MONSTER:
+                return 'Monster'
+            elif self is self.ARTIFACT:
+                return 'Artifact'
+            else:
+                raise ValueError
+
+    def __init__(self, ctype, name=None, number=1, value=0):
+        self.ctype = ctype
+        self.name = name if name else ctype.ToString()
+        self.number = number
+        self.value = value
+
+
+class Deck:
+    def __init__(self, ctype='Quest'):
+        self.cardset: List[Card] = []
+        if ctype == 'Quest':
+            for i in range(5):
+                self.cardset.append(
+                    Card(Card.Type.JEWEL, 'Gold', number=randint(10, 15), value=10))
+                self.cardset.append(
+                    Card(Card.Type.JEWEL, 'Obsidian', number=randint(10, 15), value=5))
+                self.cardset.append(
+                    Card(Card.Type.JEWEL, 'Turquoise', number=randint(10, 15), value=1))
+                self.cardset.append(Card(Card.Type.ARTIFACT, value=5))
+            for i in range(3):
+                self.cardset.append(Card(Card.Type.MONSTER, 'Viper'))
+                self.cardset.append(Card(Card.Type.MONSTER, 'Spider'))
+                self.cardset.append(Card(Card.Type.MONSTER, 'Mummy'))
+                self.cardset.append(Card(Card.Type.MONSTER, 'Flame'))
+                self.cardset.append(Card(Card.Type.MONSTER, 'Collapse'))
+        elif ctype == 'Temple':
+            self.cardset.append(Card(Card.Type.TEMPLE, '第一神殿'))
+            self.cardset.append(Card(Card.Type.TEMPLE, '第二神殿'))
+            self.cardset.append(Card(Card.Type.TEMPLE, '第三神殿'))
+            self.cardset.append(Card(Card.Type.TEMPLE, '第四神殿'))
+            self.cardset.append(Card(Card.Type.TEMPLE, '第五神殿'))
+        shuffle(self.cardset)
+
+    def Draw(self):
+        card = choice(self.cardset)
+        self.cardset.remove(card)
+        return card
+
+    def Remove(self, name):
+        self.cardset = [card for card in self.cardset if card.name != name]
+
+    def DrawArtifact(self):
+        card = choice(self.cardset)
+        while card.ctype is not Card.Type.ARTIFACT:
+            card = choice(self.cardset)
+        self.cardset.remove(card)
+        return card
+
+    def DrawJewel(self):
+        card = choice(self.cardset)
+        while card.ctype is Card.Type.MONSTER:
+            card = choice(self.cardset)
+        self.cardset.remove(card)
+        return card
+
+
+def InitPlayer(self: Incan, uid, name):
+    from copy import deepcopy
+    self.members[uid] = {
+        'status': 0,
+        'name': name,
+        'treasures': treasures,
+        'income': deepcopy(treasures)
+    }
 
 
 async def EnterNextRound(model: Incan):
@@ -176,21 +318,100 @@ async def Gaming(model: Incan):
         return await EnterNextRound(model)
 
 
-@app.on_command(['go', 'forward'], "gaming")
+@app.on_command(["incan", "印加"])
+async def game_entrance():
+    await app.start()
+
+    # 初始化模型
+    model = Incan()
+
+    # 缓存
+    app.cache.model = model
+
+    name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
+
+    # 操作
+    InitPlayer(model, app.user_id, name)
+    await app.send(greeting)
+
+
+@app.on_state_command(['go', 'forward'], "gaming")
 async def handle():
     model: Incan = app.cache.model
-    uid = app.event.user_id
+    uid = app.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 1
     if await Gaming(model):
-        await exit_incan(app, model)
+        await exit_incan()
 
 
-@app.on_command(['back', 'retreat', 'escape'], "gaming")
+@app.on_state_command(['back', 'retreat', 'escape'], "gaming")
 async def handle():
     model: Incan = app.cache.model
-    uid = app.event.user_id
+    uid = app.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 2
     if await Gaming(model):
-        await exit_incan(app, model)
+        await exit_incan()
+
+
+@app.on_state_command(['start', 'run'])
+async def handle():
+    model: Incan = app.cache.model
+    app.set_state("gaming")
+
+    await app.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
+    await app.send(f'第1轮：{model.temples.Draw().name}')
+
+    for uid in model.members:
+        app.add_listener(uid)
+
+
+@app.on_state_command("join")
+async def handle():
+    model: Incan = app.cache.model
+    name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
+    uid = app.user_id
+
+    if uid in model.members:
+        await app.send(f'{name}已经在小队中了，无需重复加入')
+    else:
+        InitPlayer(model, uid, name)
+        await app.send(f'<{name}>加入了小队，当前小队共{len(model.members)}人。')
+
+
+@app.on_state_command(['exit', 'quit', "退出"], "*")
+async def exit_incan():
+    app.remove_listener()
+    await app.send('游戏结束~下次再见~')
+    await app.close()
+
+
+@app.on_state_command(["status", "状态"])
+async def handle():
+    model: Incan = app.cache.model
+    ans = f'队伍玩家有：<{">, <".join([model.members[uid]["name"] for uid in model.members])}>'
+    await app.send(ans)
+
+
+@app.on_state_command(["status", "状态"], "gaming")
+async def handle():
+    model: Incan = app.cache.model
+
+    status = '角色状态：'
+    for uid in model.members:
+        state = '还在迷茫中' if model.members[uid]['status'] == 0 else None
+        if state is None:
+            state = '放弃冒险了' if model.members[uid]['status'] == 3 else '决定好了'
+        status += f'<{model.members[uid]["name"]}> {state}\n'
+    if model.monsters:
+        status += f'警告：\n<{">, <".join(model.monsters)}>'
+    else:
+        status += f'目前没有收到任何警告'
+
+    await app.send(status)
+
+
+@app.on_state_command(['rule', 'document', 'doc'], "*")
+async def handle():
+    await app.send(ruledoc)
