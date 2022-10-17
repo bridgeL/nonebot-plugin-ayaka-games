@@ -1,4 +1,4 @@
-# ayaka文字小游戏合集 v0.1.0
+# ayaka文字小游戏合集 v0.1.1
 
 基于ayaka开发的文字小游戏合集（共计10个）
 
@@ -24,9 +24,11 @@
 
 <summary>更新记录</summary>
 
-版本 | 备注
--|-
-0.1.0 | 适配0.3.x版本的ayaka插件
+## 0.1.0 
+适配0.3.x版本的ayaka插件
+
+## 0.1.1
+修复了checkin失效的问题
 
 </details>
 
@@ -34,16 +36,21 @@
 
 ## 安装 ayaka
 
-首先需要安装 ayaka插件 `poetry add nonebot-plugin-ayaka`
+安装 [前置插件](https://github.com/bridgeL/nonebot-plugin-ayaka) 
+
+`poetry add nonebot-plugin-ayaka`
 
 
 ## 安装 本插件
 
-安装 `poetry add nonebot-plugin-ayaka-games`
+安装 本插件
 
-修改nonebot2 在 `bot.py` 中写入 
+`poetry add nonebot-plugin-ayaka-games`
+
+修改nonebot2  `bot.py` 
 
 ```python
+# 导入ayaka_games插件
 nonebot.load_plugin("ayaka_games")
 ```
 
@@ -51,9 +58,7 @@ nonebot.load_plugin("ayaka_games")
 
 将[本仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)的data文件夹，放到nonebot的工作目录下
 
-# Documentation
-
-前置插件 [nonebot-plugin-ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)
+之后运行nonebot即可
 
 # 特别感谢
 

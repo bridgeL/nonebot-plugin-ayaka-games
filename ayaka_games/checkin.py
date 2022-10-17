@@ -2,6 +2,7 @@
     签到模块
 '''
 from ayaka import *
+import datetime
 from .bag import change_money
 
 app = AyakaApp('checkin')
