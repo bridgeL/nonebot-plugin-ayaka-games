@@ -1,4 +1,4 @@
-# ayaka文字小游戏合集 v0.1.3
+# ayaka文字小游戏合集 v0.2.0b
 
 基于ayaka开发的文字小游戏合集（共计10个）
 
@@ -6,36 +6,16 @@
 
 <b>注意：由于更新pypi的readme.md需要占用版本号，因此其readme.md可能不是最新的，强烈建议读者前往[github仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games)以获取最新版本的帮助</b>
 
+## 基础功能
 1. 背包
 2. 签到
-3. 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
-4. 原神接龙
-5. 成语接龙
-6. b站视频链接分析
-7. bingo
-8. 生成糊文字截图
-9. 缩写翻译
-10. b站up动态推送
 
-# 更新记录
-
-<details>
-
-<summary>更新记录</summary>
-
-## 0.1.0 
-适配0.3.x版本的ayaka插件
-
-## 0.1.1
-修复了checkin失效的问题
-
-## 0.1.2
-更换了加载插件的方式
-
-## 0.1.3
-增减了部分插件
-
-</details>
+## 游戏
+1. 印加宝藏 [@灯夜](https://github.com/lunexnocty/Meiri)
+2. 接龙（多题库可选，原神/成语）
+3. bingo
+4. 谁是卧底
+5. 抢30
 
 # How to start
 

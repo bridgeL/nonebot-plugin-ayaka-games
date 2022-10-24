@@ -68,7 +68,7 @@ async def get_user(name_or_uid_or_at):
 
 
 def inquire_money(uid: int):
-    bag_file = app.group_storage(uid, default={})
+    bag_file = app.group_storage(f"{uid}.json", default={})
     bag_data = bag_file.load()
     if "money" not in bag_data:
         bag_data["money"] = 1000
@@ -80,7 +80,7 @@ def change_money(diff: int, uid: int):
     if diff == 0:
         return
 
-    bag_file = app.group_storage(uid, default={})
+    bag_file = app.group_storage(f"{uid}.json", default={})
     bag_data = bag_file.load()
     if "money" not in bag_data:
         bag_data["money"] = 1000

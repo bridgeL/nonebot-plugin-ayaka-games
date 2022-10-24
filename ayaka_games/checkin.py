@@ -1,7 +1,7 @@
 '''
     签到模块
 '''
-from ayaka import *
+from ayaka import AyakaApp
 import datetime
 from .bag import change_money
 
@@ -14,7 +14,7 @@ app.help = '''签到
 @app.on_command(['checkin', '签到'])
 async def checkin():
     # 判断是否签到过，结果保存到本地
-    file = app.group_storage(app.user_id, default="")
+    file = app.group_storage(f"{app.user_id}.txt", default="")
     _date = file.load()
     date = str(datetime.datetime.now().date())
     name = app.user_name

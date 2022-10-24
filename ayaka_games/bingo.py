@@ -4,7 +4,7 @@ bingo 小游戏
 from random import randint, seed
 from time import time
 from .bag import change_money
-from ayaka import *
+from ayaka import AyakaApp
 
 app = AyakaApp("bingo")
 app.help = '''经典小游戏
