@@ -6,7 +6,7 @@ import re
 from random import choice
 from typing import Dict, List, Tuple
 from pypinyin import lazy_pinyin
-from .bag import change_money
+from .user_bag import change_money
 from ayaka import AyakaApp
 
 app = AyakaApp("接龙")
@@ -19,6 +19,7 @@ app.help = '''接龙，在聊天时静默运行
 - data 展示你的答题数据
 - rank 展示排行榜
 - exit 退出管理面板
+- auto <词库名称> <开头词> 使用指定词库自动接龙10个
 '''
 
 
@@ -57,6 +58,16 @@ class Dragon:
 
         self.last_p = ""
 
+    def _get_next(self, p: str):
+        '''输入拼音返回接龙'''
+        # 词穷了
+        if p not in self.search_dict:
+            return
+
+        # 成功接龙
+        next = choice(self.search_dict[p])
+        return next
+
     def get_next(self, text: str) -> Tuple[bool, bool, str]:
         '''
             返回：
@@ -89,18 +100,18 @@ class Dragon:
 
         # 尝试接龙
         p = lazy_pinyin(word)[-1]
+        next = self._get_next(p)
 
         # 词穷了
-        if p not in self.search_dict:
+        if not next:
             # 本次接龙结束
             self.last_p = ""
-            return belong_to_words, last_success, next
 
         # 成功接龙
-        next = choice(self.search_dict[p])
+        else:
+            # 更新龙尾
+            self.last_p = lazy_pinyin(next)[-1]
 
-        # 更新龙尾
-        self.last_p = lazy_pinyin(next)[-1]
         return belong_to_words, last_success, next
 
 
@@ -127,7 +138,7 @@ async def handle():
             continue
 
         if last_success:
-            change_money(1000, app.user_id)
+            change_money(app.user_id, 1000)
             await app.send(f"[{app.user_name}] 接龙成功！奖励1000金")
 
             # 记录
@@ -150,7 +161,7 @@ async def app_entrance():
     await app.send(app.help)
 
 
-@app.on_state_command("exit")
+@app.on_state_command(["exit", "退出"])
 async def app_exit():
     await app.close()
 
@@ -241,3 +252,35 @@ async def show_rank():
             cnt = item["cnt"]
             info += f"  - [{uname}] 接龙次数 {cnt}\n"
     await app.send(info.strip())
+
+
+@app.on_state_command("auto")
+async def auto_dragon():
+    '''自动接龙10个'''
+    try:
+        name = str(app.args[0])
+        word = str(app.args[1])
+        if not word:
+            raise
+    except:
+        await app.send("参数缺失")
+        return
+
+    for dragon in dragons:
+        if dragon.name == name:
+            break
+    else:
+        await app.send(f"没有找到词库[{name}]")
+        return
+
+    info = word
+    for i in range(10):
+        p = lazy_pinyin(word)[-1]
+        next = dragon._get_next(p)
+        if next:
+            word = next
+            info = info[:-1] + word
+        else:
+            break
+
+    await app.send(info)

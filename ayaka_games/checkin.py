@@ -3,9 +3,9 @@
 '''
 from ayaka import AyakaApp
 import datetime
-from .bag import change_money
+from .user_bag import change_money
 
-app = AyakaApp('checkin')
+app = AyakaApp('签到')
 app.help = '''签到
 - 签到/checkin
 '''
@@ -26,6 +26,6 @@ async def checkin():
     file.save(date)
 
     # 签到奖励
-    money = change_money(10000, app.user_id)
+    money = change_money(app.user_id, 10000)
     await app.send(f"[{name}] 签到成功，系统奖励 10000金")
     await app.send(f"[{name}] 当前拥有 {money}金")
