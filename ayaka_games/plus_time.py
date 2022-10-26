@@ -14,7 +14,7 @@ app = AyakaApp("加一秒")
 app.help = '''
 每人初始时间值为0
 每有3个不同的人执行一次或若干次加1，boss就会完成蓄力，吸取目前时间值最高的人的时间，如果有多人，则均吸取1点
-boss时间值>=10时，游戏结束，时间值<=boss的人中，时间值最高的人获胜，一切重置
+boss时间值>=10时，游戏结束，boss将带走所有比他时间值高的人，剩余人中时间值最高的获胜，世界重启
 - 加一秒 启动游戏
 - exit/退出 退出游戏（数据保留）
 
@@ -204,6 +204,13 @@ class Game:
         self.player_group = PlayerGroup()
         self.boss = Boss(self.player_group)
 
+    def get_over_players(self):
+        boss_time = self.boss.time
+        data = self.player_group.data
+        # 时间值>boss的人
+        uids = [uid for uid, time in data.items() if time > boss_time]
+        return uids
+
     def get_winners(self):
         boss_time = self.boss.time
         data = self.player_group.data
@@ -239,7 +246,7 @@ async def inquiry_boss():
 
 
 @app.on_state_command("全部")
-async def inquiry_boss():
+async def inquiry_all():
     game: Game = app.cache.game
 
     # boss
@@ -272,6 +279,7 @@ async def plus():
     game.boss.add_power(app.user_id)
     await app.send(game.boss.state)
 
+    # boss 能量不够
     if game.boss.power < game.boss.max_power:
         return
 
@@ -292,22 +300,39 @@ async def plus():
 
     # 告知被攻击情况
     items = [f"[{user_data[uid]}] {choice(feelings)}" for uid in uids]
-    await app.send("\n".join(items))
+    info = "\n".join(items)
+    await app.send(info)
+    await inquiry_all()
 
+    # boss 时间不够
     if game.boss.time < game.boss.max_time:
         return
 
-    # 游戏结束，告知胜利者
-    uids = game.get_winners()
-
+    # 游戏结束
     await sleep(2)
     await app.send(f"boss的时间超越了世界的界限，{choice(restarts)}...")
     await sleep(2)
     await app.send("...")
     await sleep(2)
 
+    # 带走时间过高的玩家
+    uids = game.get_over_players()
     items = [f"[{user_data[uid]}]" for uid in uids]
-    info = "在上一个世界中：" + "、".join(items) + " 是最终的赢家！"
+
+    if items:
+        info = f"boss带走了所有时间高于它的玩家：" + "、".join(items)
+        await app.send(info)
+
+    # 告知胜利者
+    uids = game.get_winners()
+    items = [f"[{user_data[uid]}]" for uid in uids]
+
+    if not items:
+        info = "没有人"
+    else:
+        info = "、".join(items)
+
+    info = "在上一个世界中：" + info + "是最终的赢家！"
     await app.send(info)
 
     game.player_group.clear_all()
