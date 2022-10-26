@@ -1,6 +1,6 @@
 <div align="center">
 
-# ayaka文字小游戏合集 v0.2.1b0
+# ayaka文字小游戏合集 v0.2.1
 
 基于ayaka开发的文字小游戏合集（预计10个）
 
