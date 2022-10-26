@@ -14,7 +14,7 @@ app = AyakaApp("加一秒")
 app.help = '''
 每人初始时间值为0
 每有3个不同的人执行一次或若干次加1，boss就会完成蓄力，吸取目前时间值最高的人的时间，如果有多人，则均吸取1点
-boss时间值>=10时，游戏结束，boss将带走所有比他时间值高的人，剩余人中时间值最高的获胜，世界重启
+boss时间值>=5时，游戏结束，boss将带走所有比他时间值高的人，剩余人中时间值最高的获胜，世界重启
 - 加一秒 启动游戏
 - exit/退出 退出游戏（数据保留）
 
@@ -126,7 +126,7 @@ class Boss:
         "uids": []
     }
 
-    max_time = 10
+    max_time = 5
     max_power = 3
 
     def __init__(self, player_group: PlayerGroup) -> None:
