@@ -26,16 +26,15 @@
 
 ## 安装 
 
-1. 安装 ayaka https://github.com/bridgeL/nonebot-plugin-ayaka
-2. 安装 本插件 `poetry add nonebot-plugin-ayaka-games`
-3. 修改nonebot2  `bot.py` 
+1. 安装 本插件 `poetry add nonebot-plugin-ayaka-games`
+2. 修改nonebot2  `bot.py` 
 
 ```python
 # 导入ayaka_games插件
 nonebot.load_plugin("ayaka_games")
 ```
 
-4. 导入数据
+3. 导入数据
 
 将本仓库的data文件夹，放到nonebot的工作目录下
 
