@@ -2,15 +2,9 @@ from typing import List
 from enum import Enum
 from random import randint, choice, shuffle
 from ayaka import AyakaApp
-app = AyakaApp("incan")
 
-app.help = '''指令列表: 
-[start/run] 开始游戏
-[join] 加入游戏
-[status] 查看状态
-[go/back] 前进/撤退
-[rule/doc] 查看规则
-[exit/quit] 退出'''
+app = AyakaApp("incan")
+app.help = "欢迎使用印加宝藏2.0\n如果在游戏过程中有什么问题或建议，请@灯夜(2692327749)"
 
 ruledoc = '''1. 前进，玩家翻开一张卡牌
 2. 撤退，玩家沿着来时的路径原路返回
@@ -52,13 +46,6 @@ deads = [
     '该说是有勇气呢还是无谋呢还是说盲目自信呢……不是很懂你们这些人类。'
     '不要放弃，下次更加谨慎一点吧！'
 ]
-
-greeting = '''欢迎使用印加宝藏2.0
-输入[join]加入游戏
-输入[start/run]开始游戏
-输入[help]可以查看指令列表
-输入[rule/doc查看游戏规则
-如果在游戏过程中有什么问题或建议，请@灯夜(2692327749)'''
 
 treasures = {
     'Turquoise': {
@@ -320,6 +307,7 @@ async def Gaming(model: Incan):
 
 @app.on_command(["incan", "印加"])
 async def game_entrance():
+    '''打开应用'''
     await app.start()
 
     # 初始化模型
@@ -332,11 +320,12 @@ async def game_entrance():
 
     # 操作
     InitPlayer(model, app.user_id, name)
-    await app.send(greeting)
+    await app.send(app.help)
 
 
 @app.on_state_command(['go', 'forward'], "gaming")
 async def handle():
+    '''前进'''
     model: Incan = app.cache.model
     uid = app.user_id
     if model.members[uid]['status'] == 0:
@@ -347,6 +336,7 @@ async def handle():
 
 @app.on_state_command(['back', 'retreat', 'escape'], "gaming")
 async def handle():
+    '''撤退'''
     model: Incan = app.cache.model
     uid = app.user_id
     if model.members[uid]['status'] == 0:
@@ -357,6 +347,7 @@ async def handle():
 
 @app.on_state_command(['start', 'run'])
 async def handle():
+    '''开始游戏'''
     model: Incan = app.cache.model
     app.set_state("gaming")
 
@@ -369,6 +360,7 @@ async def handle():
 
 @app.on_state_command("join")
 async def handle():
+    '''加入游戏'''
     model: Incan = app.cache.model
     name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
     uid = app.user_id
@@ -382,6 +374,7 @@ async def handle():
 
 @app.on_state_command(['exit', 'quit', "退出"], "*")
 async def exit_incan():
+    '''退出游戏'''
     app.remove_listener()
     await app.send('游戏结束~下次再见~')
     await app.close()
@@ -389,6 +382,7 @@ async def exit_incan():
 
 @app.on_state_command(["status", "状态"])
 async def handle():
+    '''查看状态'''
     model: Incan = app.cache.model
     ans = f'队伍玩家有：<{">, <".join([model.members[uid]["name"] for uid in model.members])}>'
     await app.send(ans)
@@ -396,6 +390,7 @@ async def handle():
 
 @app.on_state_command(["status", "状态"], "gaming")
 async def handle():
+    '''查看状态'''
     model: Incan = app.cache.model
 
     status = '角色状态：'
@@ -414,4 +409,5 @@ async def handle():
 
 @app.on_state_command(['rule', 'document', 'doc'], "*")
 async def handle():
+    '''查看规则'''
     await app.send(ruledoc)
