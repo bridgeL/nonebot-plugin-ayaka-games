@@ -2,7 +2,7 @@
 
 # ayaka文字小游戏合集 v0.2.2
 
-基于ayaka开发的文字小游戏合集（预计10个）
+基于[ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)开发的文字小游戏合集（预计10个）
 
 [仓库](https://github.com/bridgeL/nonebot-plugin-ayaka-games) - 
 [文档](https://bridgel.github.io/ayaka_doc/games/)

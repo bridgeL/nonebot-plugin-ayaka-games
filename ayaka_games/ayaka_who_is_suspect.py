@@ -5,35 +5,16 @@ from random import choice, randint
 from typing import List
 from ayaka import AyakaApp, MessageSegment
 
-init_help = '''
-至少4人游玩，游玩前请加bot好友，否则无法通过私聊告知关键词
-参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
-卧底只有一个
-- help/帮助 查看帮助
-- exit/退出 关闭应用
-'''.strip()
-
-room_help = '''
-房间已建立，正在等待玩家加入...
-- join/加入
-- leave/离开
-- start/begin/开始
-- info/信息 展示房间信息
-- exit/退出 关闭游戏
-'''.strip()
-
-play_help = '''
-游戏正在进行中...
-- vote <at> 请at你要投票的对象，一旦投票无法更改
-- info/信息 展示投票情况
-- force_exit 强制关闭游戏，有急事可用
-'''.strip()
 
 app = AyakaApp("谁是卧底")
 app.help = {
-    "init": init_help,
-    "room": room_help,
-    "play": play_help
+    "init": '''
+至少4人游玩，游玩前请加bot好友，否则无法通过私聊告知关键词
+参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
+卧底只有一个
+''',
+    "room": "房间已建立，正在等待玩家加入...",
+    "play": "游戏正在进行中..."
 }
 
 words_list = app.plugin_storage("data.json", default=[["Test", "test"]]).load()
@@ -116,7 +97,8 @@ class Game:
     @property
     def vote_info(self):
         items = ["得票情况："]
-        items.extend(f"[{p.num}] [{p.name}] {p.vote_cnt}" for p in self.no_out_players)
+        items.extend(
+            f"[{p.num}] [{p.name}] {p.vote_cnt}" for p in self.no_out_players)
         return "\n".join(items)
 
     @property
@@ -184,6 +166,10 @@ class Game:
         # 不可重投
         if src.vote_to:
             return False, f"{src} 已经投票过了"
+
+        # 不能投给已出局的
+        if obj.out:
+            return False, f"{obj} 已经出局了"
 
         src.vote_to = obj
         obj.vote_cnt += 1
@@ -263,7 +249,8 @@ async def get_uid(arg: MessageSegment):
         name = name[1:]
 
     for user in users:
-        if user["card"] == name:
+        _name = user["card"] or user["nickname"]
+        if _name == name:
             return user["user_id"]
 
 
@@ -276,12 +263,13 @@ async def check_friend(uid: int):
 
 @app.on_command("谁是卧底")
 async def app_entrance():
+    '''打开应用'''
     if not await app.start():
         return
 
-    await app.send(init_help)
+    await app.send(app.help)
     app.set_state("room")
-    await app.send(room_help)
+    await app.send(app.help)
 
     app.cache.game = Game()
     await join()
@@ -289,6 +277,7 @@ async def app_entrance():
 
 @app.on_state_command(["exit", "退出"], "room")
 async def exit_room():
+    '''关闭游戏'''
     await app.close()
 
 
@@ -299,11 +288,13 @@ async def exit_play():
 
 @app.on_state_command(["force_exit", "强制退出"], "play")
 async def app_force_exit():
+    '''强制关闭游戏，有急事可用'''
     await app.close()
 
 
 @app.on_state_command(["join", "加入"], "room")
 async def join():
+    '''加入房间'''
     # 校验好友
     if not await check_friend(app.user_id):
         await app.send("只有bot的好友才可以加入房间，因为游戏需要私聊关键词")
@@ -316,6 +307,7 @@ async def join():
 
 @app.on_state_command(["leave", "离开"], "room")
 async def leave():
+    '''离开房间'''
     game: Game = app.cache.game
     f, info = game.leave(app.user_id)
     await app.send(info)
@@ -326,6 +318,7 @@ async def leave():
 
 @app.on_state_command(["start", "begin", "开始"], "room")
 async def start():
+    '''开始游戏'''
     game: Game = app.cache.game
     f, info = game.start()
     await app.send(info)
@@ -341,12 +334,14 @@ async def start():
 
 @app.on_state_command(["info", "信息"], "room")
 async def room_info():
+    '''展示房间内成员列表'''
     game: Game = app.cache.game
     await app.send(game.room_info)
 
 
 @app.on_state_command(["info", "信息"], "play")
 async def play_info():
+    '''展示投票情况'''
     game: Game = app.cache.game
     await app.send(game.players_state)
     await app.send(game.vote_info)
@@ -354,6 +349,7 @@ async def play_info():
 
 @app.on_state_command(["vote", "投票"], "play")
 async def vote():
+    '''请at你要投票的对象，一旦投票无法更改'''
     game: Game = app.cache.game
 
     # 验证参数
