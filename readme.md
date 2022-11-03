@@ -34,10 +34,6 @@
 nonebot.load_plugin("ayaka_games")
 ```
 
-3. 导入数据
-
-将本仓库的data文件夹，放到nonebot的工作目录下
-
 之后运行nonebot即可
 
 
