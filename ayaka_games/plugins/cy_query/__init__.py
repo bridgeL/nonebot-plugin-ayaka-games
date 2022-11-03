@@ -4,17 +4,16 @@
 from ayaka import AyakaApp
 
 app = AyakaApp("成语查询")
-app.help = '''
-有效提高群文学氛围，使用方法：
-查询成语 <成语>
-'''
+app.help = '''有效提高群文学氛围'''
 
 
-search_dict: dict = app.plugin_storage("data.json", default={}).load()
+search_dict: dict = app.storage.plugin().jsonfile("data", {}).load()
 
 
-@app.on_command("查询成语")
+@app.on.idle()
+@app.on.command("查询成语")
 async def handle():
+    '''<成语>'''
     try:
         word = str(app.args[0])
     except:

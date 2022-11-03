@@ -1,5 +1,11 @@
 <div align="center">
 
+mana
+
+incan
+
+plus_one
+
 # ayaka文字小游戏合集 v0.2.2
 
 基于[ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)开发的文字小游戏合集（预计10个）

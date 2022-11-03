@@ -3,7 +3,7 @@
 '''
 from ayaka import AyakaApp
 import datetime
-from .user_bag import change_money
+from ..bag import change_money
 
 app = AyakaApp('签到')
 app.help = '''签到
@@ -11,11 +11,19 @@ app.help = '''签到
 '''
 
 
-@app.on_command(['checkin', '签到'])
+def ensure_key_is_int(data: dict):
+    data = {int(k): v for k, v in data.items()}
+    return data
+
+
+@app.on.idle()
+@app.on.command('checkin', '签到')
 async def checkin():
     # 判断是否签到过，结果保存到本地
-    file = app.group_storage(f"{app.user_id}.txt", default="")
-    _date = file.load()
+    file = app.storage.group().jsonfile("date.json", {})
+    data = file.load()
+    data = ensure_key_is_int(data)
+    _date = data.get(app.user_id, "")
     date = str(datetime.datetime.now().date())
     name = app.user_name
 
@@ -23,7 +31,8 @@ async def checkin():
         await app.send(f"[{name}] 今天已经签到过了")
         return
 
-    file.save(date)
+    data[app.user_id] = date
+    file.save(data)
 
     # 签到奖励
     money = change_money(app.user_id, 10000)

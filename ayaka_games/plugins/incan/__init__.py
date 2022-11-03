@@ -305,7 +305,8 @@ async def Gaming(model: Incan):
         return await EnterNextRound(model)
 
 
-@app.on_command(["incan", "印加"])
+@app.on.idle()
+@app.on.command("incan", "印加")
 async def game_entrance():
     '''打开应用'''
     await app.start()
@@ -323,7 +324,8 @@ async def game_entrance():
     await app.send(app.help)
 
 
-@app.on_state_command(['go', 'forward'], "gaming")
+@app.on.state("gaming")
+@app.on.command('go', 'forward')
 async def handle():
     '''前进'''
     model: Incan = app.cache.model
@@ -334,7 +336,8 @@ async def handle():
         await exit_incan()
 
 
-@app.on_state_command(['back', 'retreat', 'escape'], "gaming")
+@app.on.state("gaming")
+@app.on.command('back', 'retreat', 'escape')
 async def handle():
     '''撤退'''
     model: Incan = app.cache.model
@@ -345,11 +348,12 @@ async def handle():
         await exit_incan()
 
 
-@app.on_state_command(['start', 'run'])
+@app.on.state()
+@app.on.command('start', 'run')
 async def handle():
     '''开始游戏'''
     model: Incan = app.cache.model
-    app.set_state("gaming")
+    app.state = "gaming"
 
     await app.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
     await app.send(f'第1轮：{model.temples.Draw().name}')
@@ -358,7 +362,8 @@ async def handle():
         app.add_listener(uid)
 
 
-@app.on_state_command("join")
+@app.on.state()
+@app.on.command("join")
 async def handle():
     '''加入游戏'''
     model: Incan = app.cache.model
@@ -372,7 +377,8 @@ async def handle():
         await app.send(f'<{name}>加入了小队，当前小队共{len(model.members)}人。')
 
 
-@app.on_state_command(['exit', 'quit', "退出"], "*")
+@app.on.state("*")
+@app.on.command('exit', 'quit', "退出")
 async def exit_incan():
     '''退出游戏'''
     app.remove_listener()
@@ -380,7 +386,8 @@ async def exit_incan():
     await app.close()
 
 
-@app.on_state_command(["status", "状态"])
+@app.on.state()
+@app.on.command("status", "状态")
 async def handle():
     '''查看状态'''
     model: Incan = app.cache.model
@@ -388,17 +395,24 @@ async def handle():
     await app.send(ans)
 
 
-@app.on_state_command(["status", "状态"], "gaming")
+@app.on.state("gaming")
+@app.on.command("status", "状态")
 async def handle():
     '''查看状态'''
     model: Incan = app.cache.model
 
+    def get_state_s(uid):
+        if model.members[uid]['status'] == 0:
+            return '还在迷茫中'
+        if model.members[uid]['status'] == 3:
+            return '放弃冒险了'
+        return '决定好了'
+
     status = '角色状态：'
     for uid in model.members:
-        state = '还在迷茫中' if model.members[uid]['status'] == 0 else None
-        if state is None:
-            state = '放弃冒险了' if model.members[uid]['status'] == 3 else '决定好了'
+        state = get_state_s(uid)
         status += f'<{model.members[uid]["name"]}> {state}\n'
+        
     if model.monsters:
         status += f'警告：\n<{">, <".join(model.monsters)}>'
     else:
@@ -407,7 +421,8 @@ async def handle():
     await app.send(status)
 
 
-@app.on_state_command(['rule', 'document', 'doc'], "*")
+@app.on.state("*")
+@app.on.command('rule', 'document', 'doc')
 async def handle():
     '''查看规则'''
     await app.send(ruledoc)

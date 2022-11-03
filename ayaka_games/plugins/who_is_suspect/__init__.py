@@ -4,7 +4,7 @@
 from random import choice, randint
 from typing import List
 from ayaka import AyakaApp, MessageSegment
-
+from .utils import str_to_int, GroupUserFinder
 
 app = AyakaApp("谁是卧底")
 app.help = {
@@ -17,7 +17,10 @@ app.help = {
     "play": "游戏正在进行中..."
 }
 
-words_list = app.plugin_storage("data.json", default=[["Test", "test"]]).load()
+
+data = app.storage.plugin().file("data.txt", "TEST test").load()
+data = data.strip().split("\n")
+words_list = [d.split(" ", 1) for d in data]
 
 
 class Player:
@@ -145,7 +148,7 @@ class Game:
         # 初始化状态
         for i, p in enumerate(self.players):
             p.set_normal(normal)
-            p.num = i
+            p.num = i+1
 
         # 随机卧底
         i = randint(0, self.player_cnt - 1)
@@ -166,6 +169,10 @@ class Game:
         # 不可重投
         if src.vote_to:
             return False, f"{src} 已经投票过了"
+
+        # 已出局的不能投票
+        if src.out:
+            return False, f"{src} 已经出局了"
 
         # 不能投给已出局的
         if obj.out:
@@ -261,38 +268,36 @@ async def check_friend(uid: int):
             return True
 
 
-@app.on_command("谁是卧底")
+@app.on.idle()
+@app.on.command("谁是卧底")
 async def app_entrance():
     '''打开应用'''
     if not await app.start():
         return
 
     await app.send(app.help)
-    app.set_state("room")
+    app.state = "room"
     await app.send(app.help)
 
     app.cache.game = Game()
     await join()
 
 
-@app.on_state_command(["exit", "退出"], "room")
+@app.on.state("room")
+@app.on.command("exit", "退出")
 async def exit_room():
     '''关闭游戏'''
     await app.close()
 
 
-@app.on_state_command(["exit", "退出"], "play")
+@app.on.state("play")
+@app.on.command("exit", "退出")
 async def exit_play():
     await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
 
 
-@app.on_state_command(["force_exit", "强制退出"], "play")
-async def app_force_exit():
-    '''强制关闭游戏，有急事可用'''
-    await app.close()
-
-
-@app.on_state_command(["join", "加入"], "room")
+@app.on.state("room")
+@app.on.command("join", "加入")
 async def join():
     '''加入房间'''
     # 校验好友
@@ -305,7 +310,8 @@ async def join():
     await app.send(info)
 
 
-@app.on_state_command(["leave", "离开"], "room")
+@app.on.state("room")
+@app.on.command("leave", "离开")
 async def leave():
     '''离开房间'''
     game: Game = app.cache.game
@@ -316,7 +322,8 @@ async def leave():
         await app.close()
 
 
-@app.on_state_command(["start", "begin", "开始"], "room")
+@app.on.state("room")
+@app.on.command("start", "begin", "开始")
 async def start():
     '''开始游戏'''
     game: Game = app.cache.game
@@ -327,19 +334,21 @@ async def start():
     if not f:
         return
 
-    app.set_state("play")
+    app.state = "play"
     for p in game.players:
         await app.bot.send_private_msg(user_id=p.uid, message=p.word)
 
 
-@app.on_state_command(["info", "信息"], "room")
+@app.on.state("room")
+@app.on.command("info", "信息")
 async def room_info():
     '''展示房间内成员列表'''
     game: Game = app.cache.game
     await app.send(game.room_info)
 
 
-@app.on_state_command(["info", "信息"], "play")
+@app.on.state("play")
+@app.on.command("info", "信息")
 async def play_info():
     '''展示投票情况'''
     game: Game = app.cache.game
@@ -347,7 +356,8 @@ async def play_info():
     await app.send(game.vote_info)
 
 
-@app.on_state_command(["vote", "投票"], "play")
+@app.on.state("play")
+@app.on.command("vote", "投票")
 async def vote():
     '''请at你要投票的对象，一旦投票无法更改'''
     game: Game = app.cache.game
@@ -357,26 +367,26 @@ async def vote():
         await app.send("没有获取到有效参数")
         return
 
-    arg = app.args[0]
+    num = str_to_int(str(app.args[0]))
+    if num is not None:
+        num -= 1
+        if num < 0 or num >= game.player_cnt:
+            await app.send("没有获取到有效参数")
+            return
 
-    try:
-        num = int(str(arg))
-    except:
-        num = -1
+        uid = game.players[num].uid
 
-    if num >= 0:
-        if num >= game.player_cnt:
-            vote_to_uid = 0
-        else:
-            vote_to_uid = game.players[num].uid
     else:
-        vote_to_uid = await get_uid(arg)
+        group_user_finder = GroupUserFinder(app.bot, app.group_id)
+        user = await group_user_finder.get_user_by_segment(app.args[0])
+        if not user:
+            await app.send("没有获取到有效参数")
+            return
 
-    if not vote_to_uid:
-        await app.send("没有获取到有效参数")
+        uid = user["user_id"]
 
     # 投票
-    f, info = game.vote(app.user_id, vote_to_uid)
+    f, info = game.vote(app.user_id, uid)
     await app.send(info)
 
     # 投票失败
@@ -406,5 +416,5 @@ async def vote():
     await app.send(info)
 
     # 返回房间
-    app.set_state("room")
+    app.state = "room"
     await app.send("已回到房间，可发送start开始下一局")

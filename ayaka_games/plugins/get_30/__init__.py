@@ -10,31 +10,13 @@ init_help = '''
 至少2人游玩，一局内进行多轮叫牌，谁最先达到或超过30点谁获胜
 总共52张牌，直到全部用完后才会洗牌，只要不退出游戏，下局的牌库将继承上局
 首轮所有人筹码为10，每轮所有人筹码+1
-- help/帮助 查看帮助
-- exit/退出 关闭应用
-'''.strip()
-
-room_help = '''
-房间已建立，正在等待玩家加入...
-- join/加入
-- leave/离开
-- start/begin/开始
-- info/信息 展示房间信息
-- exit/退出 关闭游戏
-'''.strip()
-
-play_help = '''
-游戏正在进行中...
-- 数字 报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌
-- info/信息 展示当前牌、所有人筹码、报价
-- force_exit 强制关闭游戏，有急事可用
-'''.strip()
+'''
 
 app = AyakaApp("抢30")
 app.help = {
     "init": init_help,
-    "room": room_help,
-    "play": play_help
+    "room": "房间已建立，正在等待玩家加入...",
+    "play": "游戏正在进行中..."
 }
 
 
@@ -214,14 +196,16 @@ class Game:
         return "\n".join(items)
 
 
-@app.on_command("抢30")
+@app.on.idle()
+@app.on.command("抢30")
 async def app_entrance():
+    '''打开游戏'''
     if not await app.start():
         return
 
-    await app.send(init_help)
-    app.set_state("room")
-    await app.send(room_help)
+    await app.send(app.help)
+    app.state ="room"
+    await app.send(app.help)
 
     game = Game()
     app.cache.game = game
@@ -229,30 +213,40 @@ async def app_entrance():
     await app.send(info)
 
 
-@app.on_state_command(["exit", "退出"], "room")
+@app.on.state("room")
+@app.on.command("exit", "退出")
 async def exit_room():
+    '''关闭游戏'''
     await app.close()
 
 
-@app.on_state_command(["exit", "退出"], "play")
+@app.on.state("play")
+@app.on.command("exit", "退出")
 async def exit_play():
+    '''退出游戏'''
     await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
 
 
-@app.on_state_command(["force_exit", "强制退出"], "play")
+@app.on.state("play")
+@app.on.command("force_exit", "强制退出")
 async def app_force_exit():
+    '''强制关闭游戏，有急事可用'''
     await app.close()
 
 
-@app.on_state_command(["join", "加入"], "room")
+@app.on.state("room")
+@app.on.command("join", "加入")
 async def join():
+    '''加入房间'''
     game: Game = app.cache.game
     f, info = game.join(app.user_id, app.user_name)
     await app.send(info)
 
 
-@app.on_state_command(["leave", "离开"], "room")
+@app.on.state("room")
+@app.on.command("leave", "离开")
 async def leave():
+    '''离开房间'''
     game: Game = app.cache.game
     f, info = game.leave(app.user_id)
     await app.send(info)
@@ -261,8 +255,10 @@ async def leave():
         await app.close()
 
 
-@app.on_state_command(["start", "begin", "开始"], "room")
+@app.on.state("room")
+@app.on.command("start", "begin", "开始")
 async def start():
+    '''开始游戏'''
     game: Game = app.cache.game
     f, info = game.start()
     await app.send(info)
@@ -271,27 +267,33 @@ async def start():
     if not f:
         return
 
-    app.set_state("play")
+    app.state ="play"
     game.round_begin()
     await app.send(game.card_info)
     await app.send(game.player_info)
 
 
-@app.on_state_command(["info", "信息"], "room")
+@app.on.state("room")
+@app.on.command("info", "信息")
 async def room_info():
+    '''展示房间信息'''
     game: Game = app.cache.game
     await app.send(game.room_info)
 
 
-@app.on_state_command(["info", "信息"], "play")
+@app.on.state("play")
+@app.on.command("info", "信息")
 async def play_info():
+    '''展示当前牌、所有人筹码、报价'''
     game: Game = app.cache.game
     await app.send(game.card_info)
     await app.send(game.player_info)
 
 
-@app.on_state_text("play")
+@app.on.state("play")
+@app.on.text()
 async def quote():
+    '''<数字> 报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
     game: Game = app.cache.game
 
     try:
@@ -333,6 +335,6 @@ async def quote():
     p.win_cnt += 1
 
     # 返回房间
-    app.set_state("room")
+    app.state ="room"
     await app.send(game.room_info)
     await app.send("发送start开始下一局")

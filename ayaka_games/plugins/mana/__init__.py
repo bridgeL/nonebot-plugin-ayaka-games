@@ -1,8 +1,8 @@
 from random import randint
 from ayaka import AyakaApp
 from pydantic import BaseModel
-from .user_bag import get_mana, change_mana
 from asyncio import sleep
+from .utils import buy_mana, sold_mana, get_mana, change_mana
 
 god_names = ['欢愉', '悼亡', '深渊', '智慧']
 
@@ -11,9 +11,6 @@ app.help = '''
 ===== m a n a =====
 欢愉、悼亡、深渊、智慧
 ===== ======= =====
-
-- 祈祷 <数字> 花费n玛娜，祈求神的回应
-- 占卜 花费1玛娜，感受神的呼吸
 '''
 
 
@@ -47,7 +44,7 @@ class ManaGod(BaseModel):
 
 
 def get_god():
-    storage = app.group_storage("god.json")
+    storage = app.storage.group().jsonfile("god", {})
     data = storage.load()
     if not data:
         god = ManaGod()
@@ -58,7 +55,7 @@ def get_god():
 
 
 def set_god(god: ManaGod):
-    app.group_storage("god.json").save(god.dict())
+    app.storage.group().jsonfile("god").save(god.dict())
 
 
 def change_god(god_name: str, god: ManaGod):
@@ -161,13 +158,16 @@ def wise(god: ManaGod, mana: int):
     return reward, "宇宙的奥秘在命途中盘旋"
 
 
-@app.on_command(['divine', '占卜'])
+@app.on.idle()
+@app.on.command('divine', '占卜')
 async def pray():
+    '''<数字> 花费n玛娜，祈求神的回应'''
     uid = app.user_id
     name = app.user_name
+
     mana = get_mana(uid)
     if mana <= 0:
-        await app.send(f"[{name}] 只有 [{mana}]玛娜")
+        await app.send(f"[{name}] 没有玛娜")
         return
 
     change_mana(uid, -1)
@@ -182,14 +182,21 @@ async def pray():
     await app.send(god.say())
 
 
-@app.on_command(['pray', '祈祷'])
+@app.on.idle()
+@app.on.command('pray', '祈祷')
 async def handle():
+    '''花费x玛娜，感受神的呼吸'''
     try:
         arg = int(str(app.args[0]))
     except:
         arg = 1
     if arg <= 0:
         arg = 1
+
+    mana = get_mana(app.user_id)
+    if mana < arg:
+        await app.send(f"[{app.user_name}] 只有 {mana}玛娜")
+        return
 
     funcs = {
         '欢愉': happy,
@@ -218,3 +225,41 @@ async def handle():
     if old_god_name != god.name:
         await app.send("星空在惊惧中震颤，旧的命途陨落，新的命途执掌星空")
         await app.send(god.say())
+
+
+async def show_mana():
+    await app.send(f"[{app.user_name}] 当前持有 {get_mana(app.user_id)}个玛娜")
+
+
+@app.on.idle()
+@app.on.command("mana")
+async def handle():
+    '''<数字> 参数>0 买入玛娜 参数<0 卖出玛娜'''
+    if not app.args:
+        await show_mana()
+        return
+
+    try:
+        num = int(str(app.args[0]))
+    except:
+        await show_mana()
+        return
+
+    if num > 0:
+        f, money, mana = buy_mana(app.user_id, num)
+        if not f:
+            await app.send(f"[{app.user_name}] 只有{money}个金币")
+        else:
+            await app.send(f"[{app.user_name}] 购买玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
+        return
+
+    if num < 0:
+        f, money, mana = sold_mana(app.user_id, num)
+        if not f:
+            await app.send(f"[{app.user_name}] 只有{mana}个玛娜")
+        else:
+            await app.send(f"[{app.user_name}] 卖出玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
+        return
+
+    if num == 0:
+        await show_mana()

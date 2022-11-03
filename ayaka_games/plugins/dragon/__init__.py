@@ -1,26 +1,53 @@
 '''
     接龙，多个词库可选择
 '''
-import json
 import re
 from random import choice
 from typing import Dict, List, Tuple
 from pypinyin import lazy_pinyin
-from .user_bag import change_money
 from ayaka import AyakaApp
+from ..bag import change_money
 
 app = AyakaApp("接龙")
-app.help = '''接龙，在聊天时静默运行
-管理指令：
-- 接龙 进入管理面板
-- use <词库名称> 使用指定词库
-- unuse <词库名称> 关闭指定词库
-- list 列出所有词库
-- data 展示你的答题数据
-- rank 展示排行榜
-- exit 退出管理面板
-- auto <词库名称> <开头词> 使用指定词库自动接龙10个
-'''
+app.help = '''接龙，在聊天时静默运行'''
+
+
+def ensure_key_is_int(data: dict):
+    data = {int(k): v for k, v in data.items()}
+    return data
+
+
+class UserManager:
+    def get_file(self):
+        return app.storage.group().jsonfile("user", {})
+
+    def load(self):
+        data = self.get_file().load()
+        return ensure_key_is_int(data)
+
+    def get_all(self):
+        return self.load()
+
+    def get_user(self, uid: int):
+        data = self.load()
+        return data.get(uid, {})
+
+    def get_cnt(self, name: str, uid: int):
+        data = self.load()
+        return data.get(uid, {}).get(name, 0)
+
+    def add_cnt(self, name: str, uid: int):
+        file = self.get_file()
+        data = file.load()
+        data = ensure_key_is_int(data)
+        user = data.get(uid, {})
+        cnt = user.get(name, 0) + 1
+        user[name] = cnt
+        data[uid] = user
+        file.save(data)
+
+
+user_manager = UserManager()
 
 
 class Dragon:
@@ -28,23 +55,21 @@ class Dragon:
 
     @property
     def use(self):
-        if self._use.load() == "False":
-            return False
-        return True
+        return self._use
 
     @use.setter
     def use(self, val: bool):
-        self._use.save(val)
+        file = app.storage.plugin().jsonfile("use", {})
+        data = file.load()
+        data[self.name] = val
+        file.save(data)
 
     def __init__(self, name: str) -> None:
-        '''加载选择的题库'''
+        '''加载选择的词库'''
         self.name = name
-        self._use = app.plugin_storage(name, "use.txt", default="True")
+        self._use = app.storage.plugin().jsonfile("use", {}).load().get(name, True)
 
-        words = app.plugin_storage(
-            name, "bin.txt",
-            default=""
-        ).load().split()
+        words = app.storage.plugin("词库").file(f"{name}.txt").load().split()
         words = [w for w in words if w]
         search_dict = {}
         for word in words:
@@ -117,16 +142,13 @@ class Dragon:
 
 dragons: List[Dragon] = []
 
-for p in app.plugin_storage().path.iterdir():
+for p in app.storage.plugin("词库").iterdir():
     dragons.append(Dragon(p.stem))
 
 
-@app.on_text()
+@app.on.idle()
+@app.on.text()
 async def handle():
-    # 记录
-    file = app.group_storage(f"{app.user_id}.json", default={})
-    userdata: dict = file.load()
-
     # 处理
     text = app.event.get_plaintext()
     for dragon in dragons:
@@ -142,9 +164,7 @@ async def handle():
             await app.send(f"[{app.user_name}] 接龙成功！奖励1000金")
 
             # 记录
-            cnt = userdata.get(dragon.name, 0)
-            cnt += 1
-            userdata[dragon.name] = cnt
+            user_manager.add_cnt(dragon.name, app.user_id)
 
         if next:
             await app.send(next)
@@ -152,22 +172,26 @@ async def handle():
             await app.send("wo bu hui le")
         break
 
-    file.save(userdata)
 
-
-@app.on_command("接龙")
+@app.on.idle()
+@app.on.command("接龙")
 async def app_entrance():
+    '''进入管理面板'''
     await app.start()
     await app.send(app.help)
 
 
-@app.on_state_command(["exit", "退出"])
+@app.on.state()
+@app.on.command("exit", "退出")
 async def app_exit():
+    '''退出管理面板'''
     await app.close()
 
 
-@app.on_state_command("list")
+@app.on.state()
+@app.on.command("list")
 async def list_all():
+    '''列出所有词库'''
     info = "所有词库：\n"
     for dragon in dragons:
         using = "正在使用" if dragon.use else ""
@@ -175,8 +199,10 @@ async def list_all():
     await app.send(info)
 
 
-@app.on_state_command("use")
+@app.on.state()
+@app.on.command("use")
 async def use_dragon():
+    '''<词库名称> 使用指定词库'''
     try:
         name = str(app.args[0])
     except:
@@ -192,8 +218,10 @@ async def use_dragon():
     await app.send(f"没有找到词库[{name}]")
 
 
-@app.on_state_command("unuse")
+@app.on.state()
+@app.on.command("unuse")
 async def unuse_dragon():
+    '''<词库名称> 关闭指定词库'''
     try:
         name = str(app.args[0])
     except:
@@ -209,10 +237,11 @@ async def unuse_dragon():
     await app.send(f"没有找到词库[{name}]")
 
 
-@app.on_state_command("data")
+@app.on.state()
+@app.on.command("data")
 async def show_data():
-    userdata: dict = app.group_storage(
-        f"{app.user_id}.json", default={}).load()
+    '''展示你的答题数据'''
+    userdata: dict = user_manager.get_user(app.user_id)
     if not userdata:
         await app.send("数据为空，还请多多使用本功能")
         return
@@ -223,24 +252,24 @@ async def show_data():
     await app.send(info.strip())
 
 
-@app.on_state_command("rank")
+@app.on.state()
+@app.on.command("rank")
 async def show_rank():
+    '''展示排行榜'''
     total: Dict[str, list] = {}
-    for p in app.group_storage().path.iterdir():
-        uid = p.stem
-        with p.open("r", encoding="utf8") as f:
-            userdata: dict = json.load(f)
-            for name, cnt in userdata.items():
-                if name not in total:
-                    total[name] = []
-                total[name].append({"uid": uid, "cnt": cnt})
+    data = user_manager.get_all()
+    for uid, value in data.items():
+        for name, cnt in value.items():
+            if name not in total:
+                total[name] = []
+            total[name].append({"uid": uid, "cnt": cnt})
 
     if not total:
         await app.send("数据为空，还请多多使用本功能")
         return
 
     users = await app.bot.get_group_member_list(group_id=app.group_id)
-    users = {str(u["user_id"]): u["card"] or u["nickname"] for u in users}
+    users = {u["user_id"]: u["card"] or u["nickname"] for u in users}
 
     info = "排行榜\n"
     for name, items in total.items():
@@ -254,9 +283,10 @@ async def show_rank():
     await app.send(info.strip())
 
 
-@app.on_state_command("auto")
+@app.on.state()
+@app.on.command("auto")
 async def auto_dragon():
-    '''自动接龙10个'''
+    '''<词库名称> <开头词> 使用指定词库自动接龙10个'''
     try:
         name = str(app.args[0])
         word = str(app.args[1])
@@ -279,7 +309,7 @@ async def auto_dragon():
         next = dragon._get_next(p)
         if next:
             word = next
-            info = info[:-1] + word
+            info = info + word
         else:
             break
 
