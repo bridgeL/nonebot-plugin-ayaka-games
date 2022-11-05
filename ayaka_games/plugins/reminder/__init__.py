@@ -7,7 +7,7 @@ import datetime
 from typing import List
 
 from pydantic import BaseModel
-from ayaka import AyakaApp
+from ayaka import AyakaApp, MessageSegment
 from .utils import GroupUserFinder
 
 app = AyakaApp("留言")
@@ -29,7 +29,7 @@ class Reminder(BaseModel):
 
 class ReminderManager:
     def __init__(self) -> None:
-        self.file = app.storage.group().jsonfile("reminder.json", [])
+        self.file = app.storage.group_path().json("reminder.json", [])
         data = self.file.load()
         self.reminders = [Reminder(**d) for d in data]
 
@@ -95,7 +95,12 @@ async def check_reminder():
 
     items = [f"[{app.user_name}]收到的留言"]
     for msg in msgs:
-        items.append(f"[{msg.name}]在{msg.put_time}时给您留言说：\n{msg.content}")
+        items.append(msg.put_time)
+        items.append(MessageSegment.node_custom(
+            user_id=msg.uid,
+            nickname=msg.name,
+            content=msg.content
+        ))
 
     await app.send_many(items)
 
@@ -126,7 +131,10 @@ async def set_uid():
         await app.send("查无此人")
         return
 
-    app.cache.r_uid = user["user_id"]
+    r_uid = user["user_id"]
+    r_name = user["card"] or user["nickname"]
+    await app.send(f"留言给[{r_name}]({r_uid})")
+    app.cache.r_uid = r_uid
     await app.send("请输入留言内容")
     app.state = "留言.输入留言内容"
 

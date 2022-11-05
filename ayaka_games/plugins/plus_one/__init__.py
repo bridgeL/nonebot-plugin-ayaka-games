@@ -64,7 +64,7 @@ class PlayerGroup:
     def __init__(self) -> None:
         # 获得AyakaStorage
         # 如果给定了default，那么在load时，若文件不存在，会写入default作为初始值
-        self.storage = app.storage.group().jsonfile("time", {})
+        self.storage = app.storage.group_path().json("time", {})
         self.load()
 
     def load(self):
@@ -123,7 +123,7 @@ class Boss:
 
     def __init__(self, player_group: PlayerGroup) -> None:
         # 获得AyakaStorage
-        self.storage = app.storage.group().jsonfile("boss", self.boss_default)
+        self.storage = app.storage.group_path().json("boss", self.boss_default)
         self.load()
         self.player_group = player_group
 

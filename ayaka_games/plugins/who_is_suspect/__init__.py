@@ -18,7 +18,7 @@ app.help = {
 }
 
 
-data = app.storage.plugin().file("data.txt", "TEST test").load()
+data = app.storage.plugin_path().file("data.txt", "TEST test").load()
 data = data.strip().split("\n")
 words_list = [d.split(" ", 1) for d in data]
 

@@ -1,8 +1,10 @@
 <div align="center">
 
-# ayaka文字小游戏合集 v0.3.0
+# ayaka文字小游戏合集 v0.3.2
 
 基于[ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)开发的文字小游戏合集
+
+开发进度 6/10，还剩4个小游戏等待构思
 
 ## 特别感谢
 

@@ -44,7 +44,7 @@ class ManaGod(BaseModel):
 
 
 def get_god():
-    storage = app.storage.group().jsonfile("god", {})
+    storage = app.storage.group_path().json("god", {})
     data = storage.load()
     if not data:
         god = ManaGod()
@@ -55,7 +55,7 @@ def get_god():
 
 
 def set_god(god: ManaGod):
-    app.storage.group().jsonfile("god").save(god.dict())
+    app.storage.group_path().json("god").save(god.dict())
 
 
 def change_god(god_name: str, god: ManaGod):

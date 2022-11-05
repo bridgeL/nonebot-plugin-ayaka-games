@@ -12,7 +12,7 @@ app.help = "自动解析b站视频地址"
 
 
 url_matcher = re.compile(
-    r"https://(b23\.tv|www\.bilibili\.com/video)(.*?\?|.*)")
+    r"https://(b23\.tv|(www|m)\.bilibili\.com/video)(.*?\?|.*)")
 info_matcher = re.compile(r"(?P<desc>.*?)"
                           r"(?=视频播放量)(?P<digital>.*?)"
                           r"(?=视频作者)(?P<author>.*?)"

@@ -7,7 +7,7 @@ app = AyakaApp("成语查询")
 app.help = '''有效提高群文学氛围'''
 
 
-search_dict: dict = app.storage.plugin().jsonfile("data", {}).load()
+search_dict: dict = app.storage.plugin_path().json("data", {}).load()
 
 
 @app.on.idle()

@@ -20,7 +20,7 @@ def ensure_key_is_int(data: dict):
 @app.on.command('checkin', '签到')
 async def checkin():
     # 判断是否签到过，结果保存到本地
-    file = app.storage.group().jsonfile("date.json", {})
+    file = app.storage.group_path().json("date.json", {})
     data = file.load()
     data = ensure_key_is_int(data)
     _date = data.get(app.user_id, "")

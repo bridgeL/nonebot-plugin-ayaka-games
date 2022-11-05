@@ -5,19 +5,16 @@ app = AyakaApp("背包")
 app.help = '''查看拥有财富'''
 
 
-def get_user(uid) -> dict:
-    file = app.storage.group().jsonfile(uid)
-    return file.load()
-
-
 def get_user_prop(prop_name, uid, default):
-    file = app.storage.group().jsonfile(uid).keys(prop_name)
-    return file.get(default)
+    user_file = app.storage.group_path().json(uid)
+    user_ctrl = user_file.chain(prop_name)
+    return user_ctrl.get(default)
 
 
 def set_user_prop(prop_name, uid, data):
-    file = app.storage.group().jsonfile(uid).keys(prop_name)
-    file.set(data)
+    user_file = app.storage.group_path().json(uid)
+    user_ctrl = user_file.chain(prop_name)
+    user_ctrl.set(data)
     return data
 
 
@@ -33,18 +30,22 @@ def change_money(uid, diff):
     return set_money(uid, get_money(uid) + diff)
 
 
+def build_info(name, data: dict):
+    if not data:
+        return f"[{name}] 当前一无所有"
+    items = [f"{k}: {v}" for k, v in data.items()]
+    return f"[{name}]的背包\n" + "\n".join(items)
+
+
 @app.on.idle(True)
 @app.on.command("bag", "背包")
 async def show_bag():
+    user_path = app.storage.group_path()
+
     if not app.args:
-        uid = app.user_id
-        name = app.user_name
-        data = get_user(uid)
-        if not data:
-            await app.send(f"[{name}] 当前一无所有")
-        else:
-            items = [f"{k}: {v}" for k, v in data.items()]
-            await app.send(f"[{name}]的背包\n" + "\n".join(items))
+        user_file = user_path.json(app.user_id)
+        data = user_file.load()
+        await app.send(build_info(app.user_name, data))
         return
 
     group_user_finder = GroupUserFinder(app.bot, app.group_id)
@@ -55,9 +56,6 @@ async def show_bag():
 
     uid = user["user_id"]
     name = user["card"] or user["nickname"]
-    data = get_user(uid)
-    if not data:
-        await app.send(f"[{name}] 当前一无所有")
-    else:
-        items = [f"{k}: {v}" for k, v in data.items()]
-        await app.send(f"[{name}]的背包\n" + "\n".join(items))
+    user_file = user_path.json(uid)
+    data = user_file.load()
+    await app.send(build_info(name, data))

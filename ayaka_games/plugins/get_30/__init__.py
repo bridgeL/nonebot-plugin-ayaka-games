@@ -204,7 +204,7 @@ async def app_entrance():
         return
 
     await app.send(app.help)
-    app.state ="room"
+    app.state = "room"
     await app.send(app.help)
 
     game = Game()
@@ -225,13 +225,6 @@ async def exit_room():
 async def exit_play():
     '''退出游戏'''
     await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
-
-
-@app.on.state("play")
-@app.on.command("force_exit", "强制退出")
-async def app_force_exit():
-    '''强制关闭游戏，有急事可用'''
-    await app.close()
 
 
 @app.on.state("room")
@@ -267,7 +260,7 @@ async def start():
     if not f:
         return
 
-    app.state ="play"
+    app.state = "play"
     game.round_begin()
     await app.send(game.card_info)
     await app.send(game.player_info)
@@ -335,6 +328,6 @@ async def quote():
     p.win_cnt += 1
 
     # 返回房间
-    app.state ="room"
+    app.state = "room"
     await app.send(game.room_info)
     await app.send("发送start开始下一局")
