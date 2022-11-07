@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 from importlib import import_module
-from loguru import logger
+from ayaka import logger
 
 work_path = Path.cwd().absolute()
 file_path = Path(__file__)
