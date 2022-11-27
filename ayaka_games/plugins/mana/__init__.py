@@ -254,7 +254,7 @@ async def handle():
         return
 
     if num < 0:
-        f, money, mana = sold_mana(app.user_id, num)
+        f, money, mana = sold_mana(app.user_id, -num)
         if not f:
             await app.send(f"[{app.user_name}] 只有{mana}个玛娜")
         else:
