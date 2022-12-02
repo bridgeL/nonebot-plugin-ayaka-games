@@ -3,11 +3,8 @@
 '''
 import re
 import json
-from ayaka import AyakaApp
-from .url import deal
-
-app = AyakaApp("b站小程序卡片解析")
-app.help = "自动解析b站小程序卡片"
+from .app import app
+from .utils import deal
 
 
 url_matcher = re.compile(
