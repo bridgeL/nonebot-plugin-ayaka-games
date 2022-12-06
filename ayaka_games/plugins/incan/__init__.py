@@ -4,7 +4,7 @@ from random import randint, choice, shuffle
 from ayaka import AyakaApp
 
 app = AyakaApp("incan")
-app.help = "欢迎使用印加宝藏2.0\n如果在游戏过程中有什么问题或建议，请@灯夜(2692327749)"
+app.help = "欢迎使用印加宝藏2.0"
 
 ruledoc = '''1. 前进，玩家翻开一张卡牌
 2. 撤退，玩家沿着来时的路径原路返回
@@ -353,7 +353,7 @@ async def handle():
 async def handle():
     '''开始游戏'''
     model: Incan = app.cache.model
-    app.state = "gaming"
+    await app.goto("gaming")
 
     await app.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
     await app.send(f'第1轮：{model.temples.Draw().name}')

@@ -1,6 +1,8 @@
 <div align="center">
 
-# ayaka文字小游戏合集 v0.3.7
+# ayaka文字小游戏合集 v0.4.0
+
+**注意：目前兼容性较差，如果有其他插件受到影响，请安装0.3.7版本**
 
 基于[ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)开发的文字小游戏合集
 

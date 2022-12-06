@@ -108,7 +108,8 @@ async def check_reminder():
 @app.on.idle()
 @app.on.command("留言")
 async def start_reminder():
-    await app.start("留言.输入留言对象")
+    await app.start()
+    await app.goto("留言", "输入留言对象")
     app.cache.uid = app.user_id
     await app.send("请输入留言对象：用户名/uid/@")
 
@@ -136,7 +137,7 @@ async def set_uid():
     await app.send(f"留言给[{r_name}]({r_uid})")
     app.cache.r_uid = r_uid
     await app.send("请输入留言内容")
-    app.state = "留言.输入留言内容"
+    await app.goto("留言", "输入留言内容")
 
 
 @app.on.state("留言.输入留言内容")

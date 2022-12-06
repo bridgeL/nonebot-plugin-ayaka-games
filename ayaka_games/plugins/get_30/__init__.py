@@ -6,18 +6,12 @@ from random import randint
 from typing import List
 from ayaka import AyakaApp
 
-init_help = '''
+app = AyakaApp("抢30")
+app.help = '''
 至少2人游玩，一局内进行多轮叫牌，谁最先达到或超过30点谁获胜
 总共52张牌，直到全部用完后才会洗牌，只要不退出游戏，下局的牌库将继承上局
 首轮所有人筹码为10，每轮所有人筹码+1
 '''
-
-app = AyakaApp("抢30")
-app.help = {
-    "init": init_help,
-    "room": "房间已建立，正在等待玩家加入...",
-    "play": "游戏正在进行中..."
-}
 
 
 class Player:
@@ -200,11 +194,9 @@ class Game:
 @app.on.command("抢30")
 async def app_entrance():
     '''打开游戏'''
-    if not await app.start():
-        return
-
+    await app.start()
     await app.send(app.help)
-    app.state = "room"
+    await app.goto("room")
     await app.send(app.help)
 
     game = Game()
@@ -260,7 +252,7 @@ async def start():
     if not f:
         return
 
-    app.state = "play"
+    await app.goto("play")
     game.round_begin()
     await app.send(game.card_info)
     await app.send(game.player_info)
@@ -328,6 +320,6 @@ async def quote():
     p.win_cnt += 1
 
     # 返回房间
-    app.state = "room"
+    await app.goto("room")
     await app.send(game.room_info)
     await app.send("发送start开始下一局")

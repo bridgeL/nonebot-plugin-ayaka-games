@@ -272,11 +272,9 @@ async def check_friend(uid: int):
 @app.on.command("谁是卧底")
 async def app_entrance():
     '''打开应用'''
-    if not await app.start():
-        return
-
+    await app.start()
     await app.send(app.help)
-    app.state = "room"
+    await app.goto("room")
     await app.send(app.help)
 
     app.cache.game = Game()
@@ -334,7 +332,7 @@ async def start():
     if not f:
         return
 
-    app.state = "play"
+    await app.goto("play")
     for p in game.players:
         await app.bot.send_private_msg(user_id=p.uid, message=p.word)
 
@@ -416,5 +414,5 @@ async def vote():
     await app.send(info)
 
     # 返回房间
-    app.state = "room"
+    await app.goto("room")
     await app.send("已回到房间，可发送start开始下一局")

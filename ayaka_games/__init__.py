@@ -3,6 +3,7 @@ from .plugins.bag import *
 from .plugins.bili import *
 from .plugins.calc_24 import *
 from .plugins.checkin import *
+from .plugins.dragon import *
 from .plugins.cy_query import *
 from .plugins.get_30 import *
 from .plugins.incan import *
