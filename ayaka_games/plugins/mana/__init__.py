@@ -1,6 +1,6 @@
 from random import randint
-from ayaka import AyakaApp
-from pydantic import BaseModel
+from ayaka import AyakaApp, AyakaInputModel
+from pydantic import BaseModel, Field
 from asyncio import sleep
 from .utils import buy_mana, sold_mana, get_mana, change_mana
 
@@ -12,6 +12,14 @@ app.help = '''
 欢愉、悼亡、深渊、智慧
 ===== ======= =====
 '''
+
+
+class ManaInput(AyakaInputModel):
+    number: int = Field(0, description="正数为买入，负数为卖出，0为查询")
+
+
+class PrayInput(AyakaInputModel):
+    number: int = Field(description="至少花费1", ge=1)
 
 
 class ManaGod(BaseModel):
@@ -161,7 +169,7 @@ def wise(god: ManaGod, mana: int):
 @app.on.idle()
 @app.on.command('divine', '占卜')
 async def pray():
-    '''<数字> 花费n玛娜，祈求神的回应'''
+    '''<数字> 花费1玛娜，祈求神的回应'''
     uid = app.user_id
     name = app.user_name
 
@@ -184,14 +192,11 @@ async def pray():
 
 @app.on.idle()
 @app.on.command('pray', '祈祷')
+@app.on_model(PrayInput)
 async def handle():
-    '''花费x玛娜，感受神的呼吸'''
-    try:
-        arg = int(str(app.args[0]))
-    except:
-        arg = 1
-    if arg <= 0:
-        arg = 1
+    '''花费n玛娜，感受神的呼吸'''
+    data: PrayInput = app.model_data
+    arg = data.number
 
     mana = get_mana(app.user_id)
     if mana < arg:
@@ -233,15 +238,12 @@ async def show_mana():
 
 @app.on.idle()
 @app.on.command("mana")
+@app.on_model(ManaInput)
 async def handle():
-    '''<数字> 参数>0 买入玛娜 参数<0 卖出玛娜'''
-    if not app.args:
-        await show_mana()
-        return
+    data: ManaInput = app.model_data
+    num = data.number
 
-    try:
-        num = int(str(app.args[0]))
-    except:
+    if num == 0:
         await show_mana()
         return
 
@@ -261,5 +263,3 @@ async def handle():
             await app.send(f"[{app.user_name}] 卖出玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
         return
 
-    if num == 0:
-        await show_mana()

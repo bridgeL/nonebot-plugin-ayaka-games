@@ -1,22 +1,21 @@
-from ayaka import AyakaApp
+from pydantic import Field
+from ayaka import AyakaApp, AyakaInputModel
 import requests
 
 
 app = AyakaApp('缩写翻译')
-app.help = '''
-fy <参数> 缩写翻译
-'''
+
+
+class AbbrInput(AyakaInputModel):
+    abbr: str = Field(description="缩写")
 
 
 @app.on.idle()
 @app.on.command('fanyi', 'fy', '翻译')
+@app.on_model(AbbrInput)
 async def fanyi():
-    try:
-        word = str(app.args[0])
-    except:
-        await app.send('参数缺失')
-        return
-
+    data: AbbrInput = app.model_data
+    word = data.abbr
     response = requests.post(
         url='https://lab.magiconch.com/api/nbnhhsh/guess',
         data={'text': word}

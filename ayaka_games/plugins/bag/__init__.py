@@ -1,8 +1,26 @@
-from ayaka import AyakaApp
-from .utils import GroupUserFinder
+from pydantic import Field
+from typing import Optional, Union
+from ayaka import AyakaApp, AyakaInputModel, msg_type, MessageSegment
 
 app = AyakaApp("背包")
 app.help = '''查看拥有财富'''
+
+msg_at = msg_type("at")
+
+
+class UserInput(AyakaInputModel):
+    value: Optional[Union[msg_at, int, str]] = Field(
+        description="查询目标的QQ号/名称/@xx")
+
+    def is_uid(self):
+        return isinstance(self.value, (MessageSegment, int))
+
+    def get_value(self):
+        if isinstance(self.value, MessageSegment):
+            return int(self.value.data["qq"])
+        if isinstance(self.value, str) and self.value.startswith("@"):
+            return self.value[1:]
+        return self.value
 
 
 def get_user_prop(prop_name, uid, default):
@@ -39,23 +57,42 @@ def build_info(name, data: dict):
 
 @app.on.idle(True)
 @app.on.command("bag", "背包")
+@app.on_model(UserInput)
 async def show_bag():
     user_path = app.storage.group_path()
+    data: UserInput = app.model_data
+    print(data.value)
 
-    if not app.args:
+    if not data.value:
         user_file = user_path.json(app.user_id)
         data = user_file.load()
         await app.send(build_info(app.user_name, data))
         return
 
-    group_user_finder = GroupUserFinder(app.bot, app.group_id)
-    user = await group_user_finder.get_user_by_segment(app.args[0])
-    if not user:
+    users = await app.bot.get_group_member_list(group_id=app.group_id)
+    value = data.get_value()
+
+    if data.is_uid():
+        for user in users:
+            uid = user["user_id"]
+            if uid == value:
+                name = user["card"] or user["nickname"]
+                break
+        else:
+            uid = 0
+    else:
+        for user in users:
+            name = user["card"] or user["nickname"]
+            if name == value:
+                uid = user["user_id"]
+                break
+        else:
+            uid = 0
+
+    if not uid:
         await app.send("查无此人")
         return
 
-    uid = user["user_id"]
-    name = user["card"] or user["nickname"]
     user_file = user_path.json(uid)
     data = user_file.load()
     await app.send(build_info(name, data))

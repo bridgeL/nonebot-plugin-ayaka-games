@@ -4,13 +4,24 @@
 import re
 from random import choice
 from typing import Dict, List
+from pydantic import Field
 from pypinyin import lazy_pinyin
-from ayaka import AyakaApp
+from ayaka import AyakaApp, AyakaInputModel
 from pathlib import Path
 from ..bag import change_money
 
 app = AyakaApp("接龙")
 app.help = '''接龙，在聊天时静默运行'''
+
+
+class UseInput(AyakaInputModel):
+    name: str = Field(description="词库名称")
+
+
+class AutoInput(AyakaInputModel):
+    name: str = Field(description="词库名称")
+    start: str = Field(description="开头词")
+    max_len: int = Field(10, description="最大接龙长度", gt=0)
 
 
 class Dragon:
@@ -55,7 +66,6 @@ zh = re.compile(r"[\u4e00-\u9fff]+")
 @app.on.idle()
 @app.on.text()
 async def handle():
-    # 处理
     text = app.event.get_plaintext()
     r = zh.search(text)
     if not r:
@@ -130,13 +140,11 @@ async def list_all():
 
 @app.on.state()
 @app.on.command("use")
+@app.on_model(UseInput)
 async def _use_dragon():
-    '''<词库名称> 使用指定词库'''
-    try:
-        name = str(app.args[0])
-    except:
-        await app.send("参数缺失")
-        return
+    '''使用指定词库'''
+    data: UseInput = app.model_data
+    name = data.name
 
     for dragon in dragon_list:
         if dragon.name == name:
@@ -148,19 +156,16 @@ async def _use_dragon():
     use_file = app.storage.group_path().json("use")
     use_ctrl = use_file.chain(name)
     use_ctrl.set(True)
-    # app.storage.group_path().json("use").chain(name).set(True)
     await app.send(f"已使用[{name}]")
 
 
 @app.on.state()
 @app.on.command("unuse")
+@app.on_model(UseInput)
 async def _unuse_dragon():
-    '''<词库名称> 关闭指定词库'''
-    try:
-        name = str(app.args[0])
-    except:
-        await app.send("参数缺失")
-        return
+    '''关闭指定词库'''
+    data: UseInput = app.model_data
+    name = data.name
 
     for dragon in dragon_list:
         if dragon.name == name:
@@ -172,7 +177,6 @@ async def _unuse_dragon():
     use_file = app.storage.group_path().json("use")
     use_ctrl = use_file.chain(name)
     use_ctrl.set(False)
-    # app.storage.group_path().json("use").chain(name).set(False)
     await app.send(f"已停用[{name}]")
 
 
@@ -220,16 +224,13 @@ async def show_rank():
 
 @app.on.state()
 @app.on.command("auto")
+@app.on_model(AutoInput)
 async def auto_dragon():
-    '''<词库名称> <开头词> 使用指定词库自动接龙10个'''
-    try:
-        name = str(app.args[0])
-        word = str(app.args[1])
-        if not word:
-            raise
-    except:
-        await app.send("参数缺失")
-        return
+    '''使用指定词库和起始点自动接龙n个'''
+    data: AutoInput = app.model_data
+    name = data.name
+    word = data.start
+    max_len = data.max_len
 
     for dragon in dragon_list:
         if dragon.name == name:
@@ -239,12 +240,12 @@ async def auto_dragon():
         return
 
     info = word
-    for i in range(10):
+    for i in range(max_len):
         word = dragon.next(word)
         if word:
             info += " " + word
         else:
-            info += "%$#*-_"
+            info += info[-1]*3 + "%.$#*-_ 接不动了喵o_O"
             break
 
     await app.send(info)

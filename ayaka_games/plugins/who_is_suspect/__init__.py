@@ -2,20 +2,34 @@
     谁是卧底？
 '''
 from random import choice, randint
-from typing import List
-from ayaka import AyakaApp, MessageSegment
+from typing import List, Union
+
+from pydantic import Field
+from ayaka import AyakaApp, MessageSegment, AyakaInputModel, msg_type
 from .utils import str_to_int, GroupUserFinder
 
 app = AyakaApp("谁是卧底")
-app.help = {
-    "init": '''
+app.help = '''
 至少4人游玩，游玩前请加bot好友，否则无法通过私聊告知关键词
 参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
 卧底只有一个
-''',
-    "room": "房间已建立，正在等待玩家加入...",
-    "play": "游戏正在进行中..."
-}
+'''
+
+msg_at = msg_type("at")
+
+
+class UserInput(AyakaInputModel):
+    value: Union[msg_at, int, str] = Field(description="投票对象的QQ号/名称/@xx")
+
+    def is_uid(self):
+        return isinstance(self.value, (MessageSegment, int))
+
+    def get_value(self):
+        if isinstance(self.value, MessageSegment):
+            return int(self.value.data["qq"])
+        if isinstance(self.value, str) and self.value.startswith("@"):
+            return self.value[1:]
+        return self.value
 
 
 data = app.storage.plugin_path().file("data.txt", "TEST test").load()
@@ -234,33 +248,6 @@ class Game:
         return "\n".join(items)
 
 
-async def get_uid(arg: MessageSegment):
-    users = await app.bot.get_group_member_list(group_id=app.group_id)
-
-    # at？
-    if arg.type == "at":
-        at = arg
-        try:
-            uid = int(at.data["qq"])
-        except:
-            return
-
-        for user in users:
-            if user["user_id"] == uid:
-                return user["user_id"]
-        return
-
-    # 名称？
-    name = str(arg)
-    if name.startswith("@"):
-        name = name[1:]
-
-    for user in users:
-        _name = user["card"] or user["nickname"]
-        if _name == name:
-            return user["user_id"]
-
-
 async def check_friend(uid: int):
     users = await app.bot.get_friend_list()
     for user in users:
@@ -356,32 +343,31 @@ async def play_info():
 
 @app.on.state("play")
 @app.on.command("vote", "投票")
+@app.on_model(UserInput)
 async def vote():
     '''请at你要投票的对象，一旦投票无法更改'''
     game: Game = app.cache.game
 
-    # 验证参数
-    if not app.args:
-        await app.send("没有获取到有效参数")
-        return
+    data: UserInput = app.model_data
+    users = await app.bot.get_group_member_list(group_id=app.group_id)
+    value = data.get_value()
 
-    num = str_to_int(str(app.args[0]))
-    if num is not None:
-        num -= 1
-        if num < 0 or num >= game.player_cnt:
-            await app.send("没有获取到有效参数")
-            return
-
-        uid = game.players[num].uid
-
+    if data.is_uid():
+        for user in users:
+            uid = user["user_id"]
+            if uid == value:
+                name = user["card"] or user["nickname"]
+                break
+        else:
+            uid = 0
     else:
-        group_user_finder = GroupUserFinder(app.bot, app.group_id)
-        user = await group_user_finder.get_user_by_segment(app.args[0])
-        if not user:
-            await app.send("没有获取到有效参数")
-            return
-
-        uid = user["user_id"]
+        for user in users:
+            name = user["card"] or user["nickname"]
+            if name == value:
+                uid = user["user_id"]
+                break
+        else:
+            uid = 0
 
     # 投票
     f, info = game.vote(app.user_id, uid)

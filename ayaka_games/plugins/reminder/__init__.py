@@ -4,14 +4,29 @@
 
 # 有bug详见scripts/bug/reminder.ini
 import datetime
-from typing import List
-
-from pydantic import BaseModel
-from ayaka import AyakaApp, MessageSegment
-from .utils import GroupUserFinder
+from typing import List, Union
+from pydantic import BaseModel, Field
+from ayaka import AyakaApp, MessageSegment, AyakaInputModel, msg_type
 
 app = AyakaApp("留言")
 app.help = "留言，在TA再次在群里发言时发送留言内容"
+
+
+msg_at = msg_type("at")
+
+
+class UserInput(AyakaInputModel):
+    value: Union[msg_at, int, str] = Field(description="留言目标的QQ号/名称/@xx")
+
+    def is_uid(self):
+        return isinstance(self.value, (MessageSegment, int))
+
+    def get_value(self):
+        if isinstance(self.value, MessageSegment):
+            return int(self.value.data["qq"])
+        if isinstance(self.value, str) and self.value.startswith("@"):
+            return self.value[1:]
+        return self.value
 
 
 class ReminderMsg(BaseModel):
@@ -108,36 +123,54 @@ async def check_reminder():
 @app.on.idle()
 @app.on.command("留言")
 async def start_reminder():
-    await app.start()
-    await app.goto("留言", "输入留言对象")
+    await app.start("留言.输入留言对象")
     app.cache.uid = app.user_id
     await app.send("请输入留言对象：用户名/uid/@")
 
 
 @app.on.state("留言")
 @app.on.command("exit", "退出")
+@app.on_deep_all()
 async def app_exit():
     await app.close()
 
 
 @app.on.state("留言.输入留言对象")
 @app.on.text()
+@app.on_model(UserInput)
 async def set_uid():
     if app.cache.uid != app.user_id:
         return
 
-    group_user_finder = GroupUserFinder(app.bot, app.group_id)
-    user = await group_user_finder.get_user_by_segment(app.args[0])
-    if not user:
+    data: UserInput = app.model_data
+    users = await app.bot.get_group_member_list(group_id=app.group_id)
+    value = data.get_value()
+
+    if data.is_uid():
+        for user in users:
+            uid = user["user_id"]
+            if uid == value:
+                name = user["card"] or user["nickname"]
+                break
+        else:
+            uid = 0
+    else:
+        for user in users:
+            name = user["card"] or user["nickname"]
+            if name == value:
+                uid = user["user_id"]
+                break
+        else:
+            uid = 0
+
+    if not uid:
         await app.send("查无此人")
         return
 
-    r_uid = user["user_id"]
-    r_name = user["card"] or user["nickname"]
-    await app.send(f"留言给[{r_name}]({r_uid})")
-    app.cache.r_uid = r_uid
+    await app.send(f"留言给[{name}]({uid})")
+    app.cache.r_uid = uid
     await app.send("请输入留言内容")
-    await app.goto("留言", "输入留言内容")
+    await app.goto("留言.输入留言内容")
 
 
 @app.on.state("留言.输入留言内容")

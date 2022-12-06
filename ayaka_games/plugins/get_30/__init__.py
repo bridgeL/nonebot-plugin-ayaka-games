@@ -4,7 +4,9 @@
 from asyncio import sleep
 from random import randint
 from typing import List
-from ayaka import AyakaApp
+
+from pydantic import Field
+from ayaka import AyakaApp, AyakaInputModel
 
 app = AyakaApp("抢30")
 app.help = '''
@@ -12,6 +14,10 @@ app.help = '''
 总共52张牌，直到全部用完后才会洗牌，只要不退出游戏，下局的牌库将继承上局
 首轮所有人筹码为10，每轮所有人筹码+1
 '''
+
+
+class NumInput(AyakaInputModel):
+    number: int = Field(description="至少为0", ge=0)
 
 
 class Player:
@@ -277,18 +283,12 @@ async def play_info():
 
 @app.on.state("play")
 @app.on.text()
+@app.on_model(NumInput)
 async def quote():
-    '''<数字> 报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
+    '''报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
     game: Game = app.cache.game
-
-    try:
-        num = int(str(app.args[0]))
-    except:
-        num = -1
-
-    if num < 0:
-        return
-
+    data: NumInput = app.model_data
+    num = data.number
     f, info = game.quote(app.user_id, num)
 
     # 报价失败

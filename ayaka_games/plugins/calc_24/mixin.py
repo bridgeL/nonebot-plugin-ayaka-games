@@ -19,13 +19,11 @@ def register(app: AyakaApp, n: int):
     @app.on.state()
     @app.on.command("退出", "exit", "quit")
     async def _():
-        ''' '''
         await app.close()
 
     @app.on.state()
     @app.on.command("出题", "下一题", "next")
     async def set_q():
-        ''' '''
         q = choice(questions)
         ans = data[q]
         nums = q.split(" ")
@@ -36,7 +34,7 @@ def register(app: AyakaApp, n: int):
     @app.on.state()
     @app.on.command("题目", "查看题目", "查看当前题目", "当前题目")
     async def _():
-        ''' '''
+        
         nums, solution = app.cache.data
         q = " ".join(str(n) for n in nums)
         await app.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
@@ -44,7 +42,7 @@ def register(app: AyakaApp, n: int):
     @app.on.state()
     @app.on.command("答案")
     async def _():
-        ''' '''
+        
         if not app.cache.data:
             await app.send("请先出题")
             return
