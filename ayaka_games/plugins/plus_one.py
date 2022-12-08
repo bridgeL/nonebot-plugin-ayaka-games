@@ -1,14 +1,10 @@
 '''
     +1s 
-
-    使用app.storage.group永久保存数据到本地
-
-    使用app.cache快速存取数据，但是app.cache中的对象会在bot重启后丢失
 '''
 from asyncio import sleep
 from random import choice
 from typing import Dict
-from ayaka import AyakaApp
+from ayaka import AyakaApp, AyakaCache
 
 app = AyakaApp("加一秒")
 app.help = '''
@@ -62,30 +58,12 @@ def get_max(data: Dict[int, int]):
 
 class PlayerGroup:
     def __init__(self) -> None:
-        # 获得AyakaStorage
-        # 如果给定了default，那么在load时，若文件不存在，会写入default作为初始值
-        self.storage = app.storage.group_path().json("time", {})
-        self.load()
-
-    def load(self):
-        # 加载数据，如果不存在文件，则自动创建
-        data: dict = self.storage.load()
-        # json.load时，得到的key都是str类型，因此需要转换
-        self.data = {int(uid): time for uid, time in data.items()}
-
-    def save(self):
-        # 保存数据
-        # 如果是json文件，则data在写入时会自动通过json.dumps转换
-        # 如果是txt文件，则data只能是str类型
-        self.storage.save(self.data)
+        self.data = {}
 
     def get_time(self, uid: int) -> int:
         '''获取uid对应的时间值'''
-
-        # 如果不存在则设置默认值，并保存
         if uid not in self.data:
             self.data[uid] = 0
-            self.save()
             return 0
 
         # 存在则返回
@@ -99,16 +77,13 @@ class PlayerGroup:
         # 修改time
         time += diff
 
-        # 保存
         self.data[uid] = time
-        self.save()
 
         # 返回修改后的值
         return time
 
     def clear_all(self):
         self.data = {}
-        self.save()
 
 
 class Boss:
@@ -122,17 +97,8 @@ class Boss:
     max_power = 3
 
     def __init__(self, player_group: PlayerGroup) -> None:
-        # 获得AyakaStorage
-        self.storage = app.storage.group_path().json("boss", self.boss_default)
-        self.load()
+        self.data = self.boss_default
         self.player_group = player_group
-
-    def load(self):
-        # 加载数据
-        self.data = self.storage.load()
-
-    def save(self):
-        self.storage.save(self.data)
 
     @property
     def time(self) -> int:
@@ -141,7 +107,6 @@ class Boss:
     @time.setter
     def time(self, v: int):
         self.data["time"] = v
-        self.save()
 
     @property
     def power(self):
@@ -149,7 +114,6 @@ class Boss:
 
     def clear_power(self):
         self.data["uids"] = []
-        self.save()
 
     def add_power(self, uid: int):
         # 防止重复
@@ -158,7 +122,6 @@ class Boss:
             return
         uids.append(uid)
         self.data["uids"] = uids
-        self.save()
 
     def kill(self, data: dict):
         '''
@@ -191,8 +154,11 @@ class Boss:
         return info
 
 
-class Game:
-    def __init__(self) -> None:
+class Game(AyakaCache):
+    player_group: PlayerGroup = None
+    boss: Boss = None
+
+    def reset(self) -> None:
         self.player_group = PlayerGroup()
         self.boss = Boss(self.player_group)
 
@@ -213,11 +179,12 @@ class Game:
 
 @app.on.idle()
 @app.on.command("加一秒")
-async def app_start():
+async def app_start(game: Game):
     '''启动游戏'''
+    if not game.boss:
+        game.reset()
     await app.start()
     await app.send(app.help)
-    app.cache.game = Game()
 
 
 @app.on.state()
@@ -230,27 +197,23 @@ async def app_close():
 
 @app.on.state()
 @app.on.command("我的")
-async def inquiry():
+async def inquiry(game: Game):
     '''查看你目前的时间'''
-    game: Game = app.cache.game
     time = game.player_group.get_time(app.user_id)
     await app.send(f"[{app.user_name}]目前的时间：{time}")
 
 
 @app.on.state()
 @app.on.command("boss")
-async def inquiry_boss():
+async def inquiry_boss(game: Game):
     '''查看boss的时间和能量'''
-    game: Game = app.cache.game
     await app.send(game.boss.state)
 
 
 @app.on.state()
 @app.on.command("全部")
-async def inquiry_all():
+async def inquiry_all(game: Game):
     '''查看所有人参与情况，以及boss的时间和能量'''
-    game: Game = app.cache.game
-
     # boss
     info = game.boss.state
 
@@ -271,9 +234,8 @@ async def inquiry_all():
 
 @app.on.state()
 @app.on.command("加1", "加一", "+1", "+1s")
-async def plus():
+async def plus(game: Game):
     '''让你的时间+1'''
-    game: Game = app.cache.game
 
     # 玩家
     time = game.player_group.change_time(app.user_id, 1)
@@ -306,7 +268,7 @@ async def plus():
     items = [f"[{user_data[uid]}] {choice(feelings)}" for uid in uids]
     info = "\n".join(items)
     await app.send(info)
-    await inquiry_all()
+    await inquiry_all(game)
 
     # boss 时间不够
     if game.boss.time < game.boss.max_time:

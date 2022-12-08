@@ -4,9 +4,8 @@
 from asyncio import sleep
 from random import randint
 from typing import List
-
 from pydantic import Field
-from ayaka import AyakaApp, AyakaInputModel
+from ayaka import AyakaApp, AyakaInput, AyakaCache
 
 app = AyakaApp("抢30")
 app.help = '''
@@ -16,7 +15,7 @@ app.help = '''
 '''
 
 
-class NumInput(AyakaInputModel):
+class NumInput(AyakaInput):
     number: int = Field(description="至少为0", ge=0)
 
 
@@ -44,9 +43,16 @@ def shuffle(array: list):
     return result
 
 
-class Game:
-    def __init__(self) -> None:
-        self.players: List[Player] = []
+class Game(AyakaCache):
+    players: List[Player] = []
+    cards: List[int] = []
+    first: int = -1
+    i: int = 0
+    card: int = 0
+    last_quote: int = -1
+
+    def reset(self):
+        self.players = []
         self.cards = []
         self.first = -1
         self.i = 0
@@ -198,15 +204,14 @@ class Game:
 
 @app.on.idle()
 @app.on.command("抢30")
-async def app_entrance():
+async def app_entrance(game: Game):
     '''打开游戏'''
     await app.start()
     await app.send(app.help)
     await app.goto("room")
     await app.send(app.help)
 
-    game = Game()
-    app.cache.game = game
+    game.reset()
     f, info = game.join(app.user_id, app.user_name)
     await app.send(info)
 
@@ -227,18 +232,16 @@ async def exit_play():
 
 @app.on.state("room")
 @app.on.command("join", "加入")
-async def join():
+async def join(game: Game):
     '''加入房间'''
-    game: Game = app.cache.game
     f, info = game.join(app.user_id, app.user_name)
     await app.send(info)
 
 
 @app.on.state("room")
 @app.on.command("leave", "离开")
-async def leave():
+async def leave(game: Game):
     '''离开房间'''
-    game: Game = app.cache.game
     f, info = game.leave(app.user_id)
     await app.send(info)
 
@@ -248,9 +251,8 @@ async def leave():
 
 @app.on.state("room")
 @app.on.command("start", "begin", "开始")
-async def start():
+async def start(game: Game):
     '''开始游戏'''
-    game: Game = app.cache.game
     f, info = game.start()
     await app.send(info)
 
@@ -260,34 +262,27 @@ async def start():
 
     await app.goto("play")
     game.round_begin()
-    await app.send(game.card_info)
-    await app.send(game.player_info)
+    await play_info(game)
 
 
 @app.on.state("room")
 @app.on.command("info", "信息")
-async def room_info():
+async def room_info(game: Game):
     '''展示房间信息'''
-    game: Game = app.cache.game
     await app.send(game.room_info)
 
 
 @app.on.state("play")
 @app.on.command("info", "信息")
-async def play_info():
+async def play_info(game: Game):
     '''展示当前牌、所有人筹码、报价'''
-    game: Game = app.cache.game
-    await app.send(game.card_info)
-    await app.send(game.player_info)
+    await app.send(game.card_info + "\n" + game.player_info)
 
 
 @app.on.state("play")
 @app.on.text()
-@app.on_model(NumInput)
-async def quote():
+async def quote(data: NumInput, game: Game):
     '''报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
-    game: Game = app.cache.game
-    data: NumInput = app.model_data
     num = data.number
     f, info = game.quote(app.user_id, num)
 
@@ -296,7 +291,7 @@ async def quote():
         await app.send(info)
         return
 
-    await app.send(game.player_info)
+    await play_info(game)
 
     # 本轮是否结束
     if not game.round_is_end:
@@ -310,8 +305,8 @@ async def quote():
     if not p:
         await sleep(2)
         game.round_begin()
-        await app.send("下一轮\n所有人筹码+1\n" + game.card_info)
-        await app.send(game.player_info)
+        await app.send("下一轮\n所有人筹码+1")
+        await play_info(game)
         return
 
     await app.send(game.player_info)

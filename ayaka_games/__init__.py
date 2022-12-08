@@ -1,4 +1,4 @@
-# 导入全部插件
+# # 导入全部插件
 from .plugins.bag import *
 from .plugins.bili import *
 from .plugins.calc_24 import *
@@ -12,3 +12,4 @@ from .plugins.nbnhhsh import *
 from .plugins.plus_one import *
 from .plugins.reminder import *
 from .plugins.who_is_suspect import *
+from .plugins.genshin_random_event import *

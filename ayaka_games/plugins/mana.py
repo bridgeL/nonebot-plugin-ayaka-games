@@ -1,8 +1,8 @@
 from random import randint
-from ayaka import AyakaApp, AyakaInputModel
-from pydantic import BaseModel, Field
+from ayaka import AyakaApp, AyakaInput, AyakaUserDB, AyakaGroupDB
+from pydantic import Field
 from asyncio import sleep
-from .utils import buy_mana, sold_mana, get_mana, change_mana
+from .bag import UserMoney
 
 god_names = ['欢愉', '悼亡', '深渊', '智慧']
 
@@ -14,19 +14,20 @@ app.help = '''
 '''
 
 
-class ManaInput(AyakaInputModel):
+class ManaInput(AyakaInput):
     number: int = Field(0, description="正数为买入，负数为卖出，0为查询")
 
 
-class PrayInput(AyakaInputModel):
+class PrayInput(AyakaInput):
     number: int = Field(description="至少花费1", ge=1)
 
 
-class ManaGod(BaseModel):
-    name = '欢愉'
-    power = 1
-    cnt = 0
-    mana = 0
+class ManaGod(AyakaGroupDB):
+    __table_name__ = "mana_god"
+    name: str = '欢愉'
+    power: int = 1
+    cnt: int = 0
+    mana: int = 0
 
     def say(self):
         words = {
@@ -51,19 +52,20 @@ class ManaGod(BaseModel):
         return f"{r} {c} {self.power}"
 
 
-def get_god():
-    storage = app.storage.group_path().json("god", {})
-    data = storage.load()
-    if not data:
-        god = ManaGod()
-        storage.save(god.dict())
-    else:
-        god = ManaGod(**data)
-    return god
+ManaGod.create_table()
 
 
-def set_god(god: ManaGod):
-    app.storage.group_path().json("god").save(god.dict())
+class UserMana(AyakaUserDB):
+    __table_name__ = "user_mana"
+    mana: int = 10
+
+    def change(self, diff):
+        self.mana += diff
+        self.save()
+        return self.mana
+
+
+UserMana.create_table()
 
 
 def change_god(god_name: str, god: ManaGod):
@@ -168,17 +170,18 @@ def wise(god: ManaGod, mana: int):
 
 @app.on.idle()
 @app.on.command('divine', '占卜')
-async def pray():
+async def pray(data: UserMana, god: ManaGod):
     '''<数字> 花费1玛娜，祈求神的回应'''
-    uid = app.user_id
     name = app.user_name
 
-    mana = get_mana(uid)
+    mana = data.mana
     if mana <= 0:
         await app.send(f"[{name}] 没有玛娜")
         return
 
-    change_mana(uid, -1)
+    data.mana -= 1
+    data.save()
+
     await app.send(f"[{name}] 花费了 1玛娜，聆听星辰的呓语")
     await sleep(1)
     await app.send(f"...")
@@ -186,21 +189,19 @@ async def pray():
     await app.send(f"...")
     await sleep(1)
 
-    god = get_god()
     await app.send(god.say())
 
 
 @app.on.idle()
 @app.on.command('pray', '祈祷')
-@app.on_model(PrayInput)
-async def handle():
+async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
     '''花费n玛娜，感受神的呼吸'''
-    data: PrayInput = app.model_data
     arg = data.number
+    name = app.user_name
 
-    mana = get_mana(app.user_id)
+    mana = usermana.mana
     if mana < arg:
-        await app.send(f"[{app.user_name}] 只有 {mana}玛娜")
+        await app.send(f"[{name}] 只有 {mana}玛娜")
         return
 
     funcs = {
@@ -210,7 +211,6 @@ async def handle():
         '智慧': wise,
     }
 
-    god = get_god()
     old_god_name = god.name
 
     func = funcs[god.name]
@@ -218,12 +218,11 @@ async def handle():
     reward = int(reward)
     await app.send(info)
 
-    set_god(god)
+    god.save()
 
-    uid = app.user_id
-    name = app.user_name
-
-    mana = change_mana(uid, reward - arg)
+    usermana.mana += reward - arg
+    usermana.save()
+    mana = usermana.mana
     await app.send(f"[{name}] 花费了 {arg}玛娜，获得了 {reward}玛娜")
     await app.send(f"[{name}] 当前有 {mana}玛娜")
 
@@ -232,34 +231,39 @@ async def handle():
         await app.send(god.say())
 
 
-async def show_mana():
-    await app.send(f"[{app.user_name}] 当前持有 {get_mana(app.user_id)}个玛娜")
-
-
 @app.on.idle()
 @app.on.command("mana")
-@app.on_model(ManaInput)
-async def handle():
-    data: ManaInput = app.model_data
+async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoney):
     num = data.number
+    name = app.user_name
+
+    mana = usermana.mana
+    money = usermoney.money
 
     if num == 0:
-        await show_mana()
+        await app.send(f"[{name}] 当前持有 {mana}个玛娜")
         return
 
+    # 买mana
     if num > 0:
-        f, money, mana = buy_mana(app.user_id, num)
-        if not f:
-            await app.send(f"[{app.user_name}] 只有{money}个金币")
-        else:
-            await app.send(f"[{app.user_name}] 购买玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
-        return
+        action = "购买"
+    else:
+        action = "卖出"
+        num = -num
 
-    if num < 0:
-        f, money, mana = sold_mana(app.user_id, -num)
-        if not f:
-            await app.send(f"[{app.user_name}] 只有{mana}个玛娜")
+    if action == "购买":
+        if money < num*1000:
+            await app.send(f"[{name}] 只有{money}个金币")
+            return
         else:
-            await app.send(f"[{app.user_name}] 卖出玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
-        return
+            money = usermoney.change(-num*1000)
+            mana = usermana.change(num)
+    else:
+        if mana < num:
+            await app.send(f"[{name}] 只有{mana}个玛娜")
+            return
+        else:
+            money = usermoney.change(num*1000)
+            mana = usermana.change(-num)
 
+    await app.send(f"[{name}] {action}玛娜成功，当前持有 {money}个金币，{mana}个玛娜")

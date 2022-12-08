@@ -2,24 +2,22 @@
     成语查询
 '''
 from pydantic import Field
-from ayaka import AyakaApp, AyakaInputModel
+from ayaka import AyakaApp, AyakaInput
+from .data import config
 
 app = AyakaApp("成语查询")
 app.help = '''有效提高群文学氛围'''
 
+search_dict = config.data
 
-class UserInput(AyakaInputModel):
+
+class UserInput(AyakaInput):
     word: str = Field(description="成语")
-
-
-search_dict: dict = app.storage.plugin_path().json("data", {}).load()
 
 
 @app.on.idle()
 @app.on.command("查询成语", "成语查询")
-@app.on_model(UserInput)
-async def handle():
-    data: UserInput = app.model_data
+async def handle(data: UserInput):
     word = data.word
 
     if word in search_dict:

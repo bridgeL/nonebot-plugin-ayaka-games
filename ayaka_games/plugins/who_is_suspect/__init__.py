@@ -2,11 +2,10 @@
     谁是卧底？
 '''
 from random import choice, randint
-from typing import List, Union
-
-from pydantic import Field
-from ayaka import AyakaApp, MessageSegment, AyakaInputModel, msg_type
-from .utils import str_to_int, GroupUserFinder
+from typing import List
+from ayaka import AyakaApp, AyakaCache
+from .data import config
+from ..utils import UserInput, get_uid_name
 
 app = AyakaApp("谁是卧底")
 app.help = '''
@@ -15,26 +14,7 @@ app.help = '''
 卧底只有一个
 '''
 
-msg_at = msg_type("at")
-
-
-class UserInput(AyakaInputModel):
-    value: Union[msg_at, int, str] = Field(description="投票对象的QQ号/名称/@xx")
-
-    def is_uid(self):
-        return isinstance(self.value, (MessageSegment, int))
-
-    def get_value(self):
-        if isinstance(self.value, MessageSegment):
-            return int(self.value.data["qq"])
-        if isinstance(self.value, str) and self.value.startswith("@"):
-            return self.value[1:]
-        return self.value
-
-
-data = app.storage.plugin_path().file("data.txt", "TEST test").load()
-data = data.strip().split("\n")
-words_list = [d.split(" ", 1) for d in data]
+words_list = config.data
 
 
 class Player:
@@ -82,9 +62,8 @@ class Player:
         return f"[{self.name}] 未投"
 
 
-class Game:
-    def __init__(self) -> None:
-        self.players: List[Player] = []
+class Game(AyakaCache):
+    players: List[Player] = []
 
     @property
     def player_cnt(self):
@@ -147,9 +126,9 @@ class Game:
     def get_words(self):
         normal, fake = choice(words_list)
 
-        # 有可能翻转
-        if randint(0, 1):
-            normal, fake = fake, normal
+        # # 有可能翻转
+        # if randint(0, 1):
+        #     normal, fake = fake, normal
 
         return normal, fake
 
@@ -257,15 +236,14 @@ async def check_friend(uid: int):
 
 @app.on.idle()
 @app.on.command("谁是卧底")
-async def app_entrance():
+async def app_entrance(game: Game):
     '''打开应用'''
     await app.start()
     await app.send(app.help)
     await app.goto("room")
     await app.send(app.help)
-
-    app.cache.game = Game()
-    await join()
+    game.players = []
+    await join(game)
 
 
 @app.on.state("room")
@@ -283,23 +261,21 @@ async def exit_play():
 
 @app.on.state("room")
 @app.on.command("join", "加入")
-async def join():
+async def join(game: Game):
     '''加入房间'''
     # 校验好友
     if not await check_friend(app.user_id):
         await app.send("只有bot的好友才可以加入房间，因为游戏需要私聊关键词")
         return
 
-    game: Game = app.cache.game
     f, info = game.join(app.user_id, app.user_name)
     await app.send(info)
 
 
 @app.on.state("room")
 @app.on.command("leave", "离开")
-async def leave():
+async def leave(game: Game):
     '''离开房间'''
-    game: Game = app.cache.game
     f, info = game.leave(app.user_id)
     await app.send(info)
 
@@ -309,9 +285,8 @@ async def leave():
 
 @app.on.state("room")
 @app.on.command("start", "begin", "开始")
-async def start():
+async def start(game: Game):
     '''开始游戏'''
-    game: Game = app.cache.game
     f, info = game.start()
     await app.send(info)
 
@@ -326,48 +301,24 @@ async def start():
 
 @app.on.state("room")
 @app.on.command("info", "信息")
-async def room_info():
+async def room_info(game: Game):
     '''展示房间内成员列表'''
-    game: Game = app.cache.game
     await app.send(game.room_info)
 
 
 @app.on.state("play")
 @app.on.command("info", "信息")
-async def play_info():
+async def play_info(game: Game):
     '''展示投票情况'''
-    game: Game = app.cache.game
     await app.send(game.players_state)
     await app.send(game.vote_info)
 
 
 @app.on.state("play")
 @app.on.command("vote", "投票")
-@app.on_model(UserInput)
-async def vote():
+async def vote(data: UserInput, game: Game):
     '''请at你要投票的对象，一旦投票无法更改'''
-    game: Game = app.cache.game
-
-    data: UserInput = app.model_data
-    users = await app.bot.get_group_member_list(group_id=app.group_id)
-    value = data.get_value()
-
-    if data.is_uid():
-        for user in users:
-            uid = user["user_id"]
-            if uid == value:
-                name = user["card"] or user["nickname"]
-                break
-        else:
-            uid = 0
-    else:
-        for user in users:
-            name = user["card"] or user["nickname"]
-            if name == value:
-                uid = user["user_id"]
-                break
-        else:
-            uid = 0
+    uid, name = await get_uid_name(app, data)
 
     # 投票
     f, info = game.vote(app.user_id, uid)

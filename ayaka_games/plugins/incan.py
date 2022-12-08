@@ -1,7 +1,7 @@
 from typing import List
 from enum import Enum
 from random import randint, choice, shuffle
-from ayaka import AyakaApp
+from ayaka import AyakaApp, AyakaCache
 
 app = AyakaApp("incan")
 app.help = "欢迎使用印加宝藏2.0"
@@ -65,19 +65,6 @@ treasures = {
         'value': 5
     }
 }
-
-
-class Incan:
-    def __init__(self):
-        self.members = {}
-        self.round = 0
-        self.route: List[Card] = []
-        self.deck = Deck()
-        self.monsters = []
-        self.artifact = 0
-        self.acquiredArtifact = 0
-        self.turn = 0
-        self.temples = Deck('Temple')
 
 
 class Card:
@@ -153,6 +140,29 @@ class Deck:
             card = choice(self.cardset)
         self.cardset.remove(card)
         return card
+
+
+class Incan(AyakaCache):
+    members: dict = {}
+    round: int = 0
+    route: List[Card] = []
+    deck: Deck = Deck()
+    monsters: list = []
+    artifact: int = 0
+    acquiredArtifact: int = 0
+    turn: int = 0
+    temples: Deck = Deck('Temple')
+
+    def reset(self):
+        self.members = {}
+        self.round = 0
+        self.route = []
+        self.deck = Deck()
+        self.monsters = []
+        self.artifact = 0
+        self.acquiredArtifact = 0
+        self.turn = 0
+        self.temples = Deck('Temple')
 
 
 def InitPlayer(self: Incan, uid, name):
@@ -307,28 +317,22 @@ async def Gaming(model: Incan):
 
 @app.on.idle()
 @app.on.command("incan", "印加")
-async def game_entrance():
+async def game_entrance(model: Incan):
     '''打开应用'''
     await app.start()
 
     # 初始化模型
-    model = Incan()
-
-    # 缓存
-    app.cache.model = model
-
-    name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
+    model.reset()
 
     # 操作
-    InitPlayer(model, app.user_id, name)
+    InitPlayer(model, app.user_id, app.user_name)
     await app.send(app.help)
 
 
 @app.on.state("gaming")
 @app.on.command('go', 'forward')
-async def handle():
+async def handle(model: Incan):
     '''前进'''
-    model: Incan = app.cache.model
     uid = app.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 1
@@ -338,9 +342,8 @@ async def handle():
 
 @app.on.state("gaming")
 @app.on.command('back', 'retreat', 'escape')
-async def handle():
+async def handle(model: Incan):
     '''撤退'''
-    model: Incan = app.cache.model
     uid = app.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 2
@@ -350,9 +353,8 @@ async def handle():
 
 @app.on.state()
 @app.on.command('start', 'run')
-async def handle():
+async def handle(model: Incan):
     '''开始游戏'''
-    model: Incan = app.cache.model
     await app.goto("gaming")
 
     await app.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
@@ -364,9 +366,8 @@ async def handle():
 
 @app.on.state()
 @app.on.command("join")
-async def handle():
+async def handle(model: Incan):
     '''加入游戏'''
-    model: Incan = app.cache.model
     name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
     uid = app.user_id
 
@@ -388,18 +389,16 @@ async def exit_incan():
 
 @app.on.state()
 @app.on.command("status", "状态")
-async def handle():
+async def handle(model: Incan):
     '''查看状态'''
-    model: Incan = app.cache.model
     ans = f'队伍玩家有：<{">, <".join([model.members[uid]["name"] for uid in model.members])}>'
     await app.send(ans)
 
 
 @app.on.state("gaming")
 @app.on.command("status", "状态")
-async def handle():
+async def handle(model: Incan):
     '''查看状态'''
-    model: Incan = app.cache.model
 
     def get_state_s(uid):
         if model.members[uid]['status'] == 0:
@@ -412,7 +411,7 @@ async def handle():
     for uid in model.members:
         state = get_state_s(uid)
         status += f'<{model.members[uid]["name"]}> {state}\n'
-        
+
     if model.monsters:
         status += f'警告：\n<{">, <".join(model.monsters)}>'
     else:
