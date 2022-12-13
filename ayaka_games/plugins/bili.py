@@ -1,8 +1,72 @@
+'''
+    自动解析b站视频地址或小程序卡片
+'''
 import re
+import json
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Tuple
-from ayaka import MessageSegment, Message
+from ayaka import AyakaApp, MessageSegment, Message
+
+app = AyakaApp("b站视频地址解析")
+app.help = "自动解析b站视频地址"
+
+
+card_url_matcher = re.compile(
+    r"https://(b23\.tv|www\.bilibili\.com/video)(.*?\?|.*)")
+
+
+def get_all_values(data: dict):
+    values = []
+    for value in data.values():
+        if isinstance(value, dict):
+            values.extend(get_all_values(value))
+        else:
+            values.append(value)
+    return values
+
+
+url_matcher = re.compile(
+    r"https://(b23\.tv|(www|m)\.bilibili\.com/video)(.*?\?|.*)")
+
+
+@app.on.idle(True)
+@app.on.text()
+async def detect_card():
+    for m in app.message:
+        if m.type == "json":
+            data: dict = json.loads(m.data['data'])
+            break
+    else:
+        return
+
+    # 提取所有层级的values
+    values = get_all_values(data)
+
+    for v in values:
+        if isinstance(v, str):
+            # 从card中抓取网址
+            r = card_url_matcher.search(v)
+            if r:
+                url = r.group()
+                msg, bv = await deal(url)
+                if bv:
+                    await app.send(msg)
+                    await app.send(bv)
+
+
+@app.on.idle(True)
+@app.on.text()
+async def detect_url():
+    data = app.event.get_plaintext()
+    r = url_matcher.search(data)
+    if r:
+        url = r.group()
+        msg, bv = await deal(url)
+        if bv:
+            await app.send(msg)
+            await app.send(bv)
+
 
 info_matcher = re.compile(r"(?P<desc>.*?)"
                           r"(?=视频播放量)(?P<digital>.*?)"

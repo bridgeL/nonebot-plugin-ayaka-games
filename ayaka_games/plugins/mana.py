@@ -2,7 +2,7 @@ from random import randint
 from ayaka import AyakaApp, AyakaInput, AyakaUserDB, AyakaGroupDB
 from pydantic import Field
 from asyncio import sleep
-from .bag import UserMoney
+from .bag import UserMoneyData
 
 god_names = ['欢愉', '悼亡', '深渊', '智慧']
 
@@ -52,9 +52,6 @@ class ManaGod(AyakaGroupDB):
         return f"{r} {c} {self.power}"
 
 
-ManaGod.create_table()
-
-
 class UserMana(AyakaUserDB):
     __table_name__ = "user_mana"
     mana: int = 10
@@ -63,9 +60,6 @@ class UserMana(AyakaUserDB):
         self.mana += diff
         self.save()
         return self.mana
-
-
-UserMana.create_table()
 
 
 def change_god(god_name: str, god: ManaGod):
@@ -233,7 +227,7 @@ async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
 
 @app.on.idle()
 @app.on.command("mana")
-async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoney):
+async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoneyData):
     num = data.number
     name = app.user_name
 

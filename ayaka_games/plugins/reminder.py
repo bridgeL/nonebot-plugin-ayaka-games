@@ -5,7 +5,7 @@ import datetime
 from typing import List
 from pydantic import BaseModel, Field
 from ayaka import AyakaApp, MessageSegment,  AyakaGroupDB, AyakaCache
-from .utils import UserInput, get_uid_name
+from ayaka.extension import UserInput
 
 app = AyakaApp("留言")
 app.help = "留言，在TA再次在群里发言时发送留言内容"
@@ -58,9 +58,6 @@ class UserReminder(AyakaGroupDB):
     def remove_reminder(self, r: Reminder):
         self.reminders.remove(r)
         self.save()
-
-
-UserReminder.create_table()
 
 
 class ReminderCache(AyakaCache):
@@ -119,12 +116,12 @@ async def set_uid(data: UserInput, cache: ReminderCache):
     if cache.uid != app.user_id:
         return
 
-    uid, name = await get_uid_name(app, data)
-
-    if not uid:
+    if not data.user:
         await app.send("查无此人")
         return
 
+    uid = data.user.id
+    name = data.user.name
     await app.send(f"留言给[{name}]({uid})")
     cache.r_uid = uid
     await app.send("请输入留言内容")

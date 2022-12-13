@@ -2,10 +2,26 @@
     谁是卧底？
 '''
 from random import choice, randint
-from typing import List
-from ayaka import AyakaApp, AyakaCache
-from .data import config
-from ..utils import UserInput, get_uid_name
+from typing import List, Tuple
+from pydantic import Field
+from ayaka import AyakaApp, AyakaCache, AyakaLargeConfig
+from ayaka.extension import UserInput, singleton, run_in_startup
+from .utils import get_path
+
+
+def get_data():
+    path = get_path("data", "suspect.txt")
+    with path.open("r", encoding="utf8") as f:
+        lines = [line.strip() for line in f]
+    return [line.split(" ") for line in lines if line]
+
+
+@run_in_startup
+@singleton
+class Config(AyakaLargeConfig):
+    __app_name__ = "谁是卧底"
+    data: List[Tuple[str, str]] = Field(default_factory=get_data)
+
 
 app = AyakaApp("谁是卧底")
 app.help = '''
@@ -13,8 +29,6 @@ app.help = '''
 参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
 卧底只有一个
 '''
-
-words_list = config.data
 
 
 class Player:
@@ -124,6 +138,7 @@ class Game(AyakaCache):
         return True, f"{p} 离开房间"
 
     def get_words(self):
+        words_list = Config().data
         normal, fake = choice(words_list)
 
         # # 有可能翻转
@@ -318,7 +333,10 @@ async def play_info(game: Game):
 @app.on.command("vote", "投票")
 async def vote(data: UserInput, game: Game):
     '''请at你要投票的对象，一旦投票无法更改'''
-    uid, name = await get_uid_name(app, data)
+    if not data.user:
+        return
+
+    uid = data.user.id
 
     # 投票
     f, info = game.vote(app.user_id, uid)

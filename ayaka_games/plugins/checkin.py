@@ -4,7 +4,7 @@
 from pydantic import Field
 from ayaka import AyakaApp, AyakaInput, AyakaUserDB, AyakaConfig
 import datetime
-from .bag import UserMoney
+from .bag import UserMoneyData
 
 app = AyakaApp('签到')
 
@@ -20,9 +20,6 @@ config = Config()
 class LastDate(AyakaUserDB):
     __table_name__ = "checkin"
     last_date: str = ""
-
-
-LastDate.create_table()
 
 
 class UserInput(AyakaInput):
@@ -43,7 +40,7 @@ async def change_checkin(data: UserInput):
 
 @app.on.idle()
 @app.on.command('checkin', '签到')
-async def checkin(last: LastDate, usermoney: UserMoney):
+async def checkin(last: LastDate, usermoney: UserMoneyData):
     date = str(datetime.datetime.now().date())
     name = app.user_name
     uid = app.user_id
