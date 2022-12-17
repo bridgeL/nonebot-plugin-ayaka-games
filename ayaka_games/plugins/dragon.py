@@ -9,7 +9,7 @@ from pypinyin import lazy_pinyin
 from ayaka.extension import singleton, run_in_startup, Timer
 from ayaka import AyakaApp, AyakaInput, AyakaLargeConfig, AyakaDB
 from .bag import UserMoneyData
-from .utils import get_path
+from .data.utils import get_path
 
 app = AyakaApp("接龙")
 app.help = '''接龙，在聊天时静默运行'''
@@ -92,12 +92,12 @@ class DragonData(AyakaDB):
 
 def get_dragon_list():
     with Timer("创建接龙配置文件"):
-        path = get_path("data", "dragon", "成语.txt")
+        path = get_path("dragon", "成语.txt")
         with path.open("r", encoding="utf8") as f:
             lines = [line.strip() for line in f]
         idiom_words = [line for line in lines if line]
 
-        path = get_path("data", "dragon", "原神.txt")
+        path = get_path("dragon", "原神.txt")
         with path.open("r", encoding="utf8") as f:
             lines = [line.strip() for line in f]
         genshin_words = [line for line in lines if line]
@@ -162,23 +162,17 @@ async def handle(usermoney: UserMoneyData):
         break
 
 
-@app.on.idle()
-@app.on.command("接龙")
+@app.on_start_cmds("接龙")
 async def app_entrance():
     '''进入管理面板'''
     await app.start()
     await app.send(app.help)
 
-
-@app.on.state()
-@app.on.command("exit", "退出")
-async def app_exit():
-    '''退出管理面板'''
-    await app.close()
+app.set_close_cmds("exit", "退出")
 
 
-@app.on.state()
-@app.on.command("list")
+@app.on_state()
+@app.on_cmd("list")
 async def list_all():
     '''列出所有词库'''
     config = Config()
@@ -192,8 +186,8 @@ async def list_all():
     await app.send("\n".join(items))
 
 
-@app.on.state()
-@app.on.command("use")
+@app.on_state()
+@app.on_cmd("use")
 async def use_dragon(data: UseInput):
     '''使用指定词库'''
     config = Config()
@@ -210,8 +204,8 @@ async def use_dragon(data: UseInput):
     await app.send(f"已使用[{name}]")
 
 
-@app.on.state()
-@app.on.command("unuse")
+@app.on_state()
+@app.on_cmd("unuse")
 async def unuse_dragon(data: UseInput):
     '''关闭指定词库'''
     config = Config()
@@ -249,8 +243,8 @@ async def show_data():
     await app.send(info)
 
 
-@app.on.state()
-@app.on.command("rank")
+@app.on_state()
+@app.on_cmd("rank")
 async def show_rank():
     '''展示排行榜'''
     config = Config()
@@ -285,8 +279,8 @@ async def show_rank():
     await app.send(info.strip())
 
 
-@app.on.state()
-@app.on.command("auto")
+@app.on_state()
+@app.on_cmd("auto")
 async def auto_dragon(data: AutoInput):
     '''使用指定词库和起始点自动接龙n个'''
     config = Config()

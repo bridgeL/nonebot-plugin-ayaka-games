@@ -315,11 +315,10 @@ async def Gaming(model: Incan):
         return await EnterNextRound(model)
 
 
-@app.on.idle()
-@app.on.command("incan", "印加")
+@app.on_start_cmds("incan", "印加")
 async def game_entrance(model: Incan):
     '''打开应用'''
-    await app.start()
+    await app.start("room")
 
     # 初始化模型
     model.reset()
@@ -329,8 +328,16 @@ async def game_entrance(model: Incan):
     await app.send(app.help)
 
 
-@app.on.state("gaming")
-@app.on.command('go', 'forward')
+@app.on_close_cmds('exit', 'quit', "退出")
+async def exit_incan():
+    '''退出游戏'''
+    app.remove_listener()
+    await app.send('游戏结束~下次再见~')
+    await app.close()
+
+
+@app.on_state("gaming")
+@app.on_cmd('go', 'forward')
 async def handle(model: Incan):
     '''前进'''
     uid = app.user_id
@@ -340,8 +347,8 @@ async def handle(model: Incan):
         await exit_incan()
 
 
-@app.on.state("gaming")
-@app.on.command('back', 'retreat', 'escape')
+@app.on_state("gaming")
+@app.on_cmd('back', 'retreat', 'escape')
 async def handle(model: Incan):
     '''撤退'''
     uid = app.user_id
@@ -351,8 +358,8 @@ async def handle(model: Incan):
         await exit_incan()
 
 
-@app.on.state()
-@app.on.command('start', 'run')
+@app.on_state("room")
+@app.on_cmd('start', 'run')
 async def handle(model: Incan):
     '''开始游戏'''
     await app.goto("gaming")
@@ -364,8 +371,8 @@ async def handle(model: Incan):
         app.add_listener(uid)
 
 
-@app.on.state()
-@app.on.command("join")
+@app.on_state("room")
+@app.on_cmd("join")
 async def handle(model: Incan):
     '''加入游戏'''
     name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
@@ -378,25 +385,16 @@ async def handle(model: Incan):
         await app.send(f'<{name}>加入了小队，当前小队共{len(model.members)}人。')
 
 
-@app.on.state("*")
-@app.on.command('exit', 'quit', "退出")
-async def exit_incan():
-    '''退出游戏'''
-    app.remove_listener()
-    await app.send('游戏结束~下次再见~')
-    await app.close()
-
-
-@app.on.state()
-@app.on.command("status", "状态")
+@app.on_state("room")
+@app.on_cmd("status", "状态")
 async def handle(model: Incan):
     '''查看状态'''
     ans = f'队伍玩家有：<{">, <".join([model.members[uid]["name"] for uid in model.members])}>'
     await app.send(ans)
 
 
-@app.on.state("gaming")
-@app.on.command("status", "状态")
+@app.on_state("gaming")
+@app.on_cmd("status", "状态")
 async def handle(model: Incan):
     '''查看状态'''
 
@@ -420,8 +418,9 @@ async def handle(model: Incan):
     await app.send(status)
 
 
-@app.on.state("*")
-@app.on.command('rule', 'document', 'doc')
+@app.on_state()
+@app.on_deep_all()
+@app.on_cmd('rule', 'document', 'doc')
 async def handle():
     '''查看规则'''
     await app.send(ruledoc)

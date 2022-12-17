@@ -26,8 +26,8 @@ class UserInput(AyakaInput):
     number: int = Field(description="至少为0", ge=0)
 
 
-@app.on.idle()
-@app.on.command("修改签到奖励")
+@app.on_idle()
+@app.on_cmd("修改签到奖励")
 async def change_checkin(data: UserInput):
     uids = app.ayaka_root_config.owners + app.ayaka_root_config.admins
     if app.user_id not in uids:
@@ -38,8 +38,8 @@ async def change_checkin(data: UserInput):
     await app.send("修改成功")
 
 
-@app.on.idle()
-@app.on.command('checkin', '签到')
+@app.on_idle()
+@app.on_cmd('checkin', '签到')
 async def checkin(last: LastDate, usermoney: UserMoneyData):
     date = str(datetime.datetime.now().date())
     name = app.user_name

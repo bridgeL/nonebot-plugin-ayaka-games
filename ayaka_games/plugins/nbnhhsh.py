@@ -10,8 +10,8 @@ class AbbrInput(AyakaInput):
     abbr: str = Field(description="缩写")
 
 
-@app.on.idle()
-@app.on.command('fanyi', 'fy', '翻译')
+@app.on_idle()
+@app.on_cmd('fanyi', 'fy', '翻译')
 async def fanyi(data: AbbrInput):
     word = data.abbr
     response = requests.post(

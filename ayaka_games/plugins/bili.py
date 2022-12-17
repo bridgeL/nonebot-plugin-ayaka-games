@@ -30,8 +30,9 @@ url_matcher = re.compile(
     r"https://(b23\.tv|(www|m)\.bilibili\.com/video)(.*?\?|.*)")
 
 
-@app.on.idle(True)
-@app.on.text()
+@app.on_idle()
+@app.on_deep_all()
+@app.on_text()
 async def detect_card():
     for m in app.message:
         if m.type == "json":
@@ -55,8 +56,9 @@ async def detect_card():
                     await app.send(bv)
 
 
-@app.on.idle(True)
-@app.on.text()
+@app.on_idle()
+@app.on_deep_all()
+@app.on_text()
 async def detect_url():
     data = app.event.get_plaintext()
     r = url_matcher.search(data)

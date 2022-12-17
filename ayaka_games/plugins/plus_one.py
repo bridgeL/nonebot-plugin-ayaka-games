@@ -177,8 +177,7 @@ class Game(AyakaCache):
         return get_max(data)
 
 
-@app.on.idle()
-@app.on.command("加一秒")
+@app.on_start_cmds("加一秒")
 async def app_start(game: Game):
     '''启动游戏'''
     if not game.boss:
@@ -187,31 +186,30 @@ async def app_start(game: Game):
     await app.send(app.help)
 
 
-@app.on.state()
-@app.on.command("exit", "退出")
+@app.on_close_cmds("exit", "退出")
 async def app_close():
     '''退出游戏（数据保留）'''
     await app.send("数据已保存")
     await app.close()
 
 
-@app.on.state()
-@app.on.command("我的")
+@app.on_state()
+@app.on_cmd("我的")
 async def inquiry(game: Game):
     '''查看你目前的时间'''
     time = game.player_group.get_time(app.user_id)
     await app.send(f"[{app.user_name}]目前的时间：{time}")
 
 
-@app.on.state()
-@app.on.command("boss")
+@app.on_state()
+@app.on_cmd("boss")
 async def inquiry_boss(game: Game):
     '''查看boss的时间和能量'''
     await app.send(game.boss.state)
 
 
-@app.on.state()
-@app.on.command("全部")
+@app.on_state()
+@app.on_cmd("全部")
 async def inquiry_all(game: Game):
     '''查看所有人参与情况，以及boss的时间和能量'''
     # boss
@@ -232,8 +230,8 @@ async def inquiry_all(game: Game):
     await app.send(info)
 
 
-@app.on.state()
-@app.on.command("加1", "加一", "+1", "+1s")
+@app.on_state()
+@app.on_cmd("加1", "加一", "+1", "+1s")
 async def plus(game: Game):
     '''让你的时间+1'''
 

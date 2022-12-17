@@ -162,8 +162,12 @@ def wise(god: ManaGod, mana: int):
     return reward, "宇宙的奥秘在命途中盘旋"
 
 
-@app.on.idle()
-@app.on.command('divine', '占卜')
+app.set_start_cmds("mana", "玛娜")
+app.set_close_cmds("exit", "退出")
+
+
+@app.on_state()
+@app.on_cmd('divine', '占卜')
 async def pray(data: UserMana, god: ManaGod):
     '''<数字> 花费1玛娜，祈求神的回应'''
     name = app.user_name
@@ -186,8 +190,8 @@ async def pray(data: UserMana, god: ManaGod):
     await app.send(god.say())
 
 
-@app.on.idle()
-@app.on.command('pray', '祈祷')
+@app.on_state()
+@app.on_cmd('pray', '祈祷')
 async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
     '''花费n玛娜，感受神的呼吸'''
     arg = data.number
@@ -225,8 +229,8 @@ async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
         await app.send(god.say())
 
 
-@app.on.idle()
-@app.on.command("mana")
+@app.on_state()
+@app.on_cmd("mana")
 async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoneyData):
     num = data.number
     name = app.user_name

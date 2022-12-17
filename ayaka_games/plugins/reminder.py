@@ -65,8 +65,8 @@ class ReminderCache(AyakaCache):
     r_uid: int = 0
 
 
-@app.on.idle()
-@app.on.text()
+@app.on_idle()
+@app.on_text()
 async def check_reminder(reminder_manager: UserReminder):
     now = datetime.datetime.now()
     time = int(now.timestamp())
@@ -95,23 +95,18 @@ async def check_reminder(reminder_manager: UserReminder):
     await app.send_many(items)
 
 
-@app.on.idle()
-@app.on.command("留言")
+@app.on_start_cmds("留言")
 async def start_reminder(cache: ReminderCache):
     await app.start("输入留言对象")
     cache.uid = app.user_id
     await app.send("请输入留言对象：用户名/uid/@")
 
 
-@app.on.state()
-@app.on.command("exit", "退出")
-@app.on_deep_all()
-async def app_exit():
-    await app.close()
+app.set_close_cmds("exit", "退出")
 
 
-@app.on.state("输入留言对象")
-@app.on.text()
+@app.on_state("输入留言对象")
+@app.on_text()
 async def set_uid(data: UserInput, cache: ReminderCache):
     if cache.uid != app.user_id:
         return
@@ -128,8 +123,8 @@ async def set_uid(data: UserInput, cache: ReminderCache):
     await app.goto("输入留言内容")
 
 
-@app.on.state("输入留言内容")
-@app.on.text()
+@app.on_state("输入留言内容")
+@app.on_text()
 async def set_content(cache: ReminderCache, reminder_manager: UserReminder):
     if cache.uid != app.user_id:
         return

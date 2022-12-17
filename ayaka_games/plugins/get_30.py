@@ -202,8 +202,7 @@ class Game(AyakaCache):
         return "\n".join(items)
 
 
-@app.on.idle()
-@app.on.command("抢30")
+@app.on_start_cmds("抢30")
 async def app_entrance(game: Game):
     '''打开游戏'''
     await app.start()
@@ -216,30 +215,30 @@ async def app_entrance(game: Game):
     await app.send(info)
 
 
-@app.on.state("room")
-@app.on.command("exit", "退出")
+@app.on_state("room")
+@app.on_cmd("exit", "退出")
 async def exit_room():
     '''关闭游戏'''
     await app.close()
 
 
-@app.on.state("play")
-@app.on.command("exit", "退出")
+@app.on_state("play")
+@app.on_cmd("exit", "退出")
 async def exit_play():
     '''退出游戏'''
     await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
 
 
-@app.on.state("room")
-@app.on.command("join", "加入")
+@app.on_state("room")
+@app.on_cmd("join", "加入")
 async def join(game: Game):
     '''加入房间'''
     f, info = game.join(app.user_id, app.user_name)
     await app.send(info)
 
 
-@app.on.state("room")
-@app.on.command("leave", "离开")
+@app.on_state("room")
+@app.on_cmd("leave", "离开")
 async def leave(game: Game):
     '''离开房间'''
     f, info = game.leave(app.user_id)
@@ -249,8 +248,8 @@ async def leave(game: Game):
         await app.close()
 
 
-@app.on.state("room")
-@app.on.command("start", "begin", "开始")
+@app.on_state("room")
+@app.on_cmd("start", "begin", "开始")
 async def start(game: Game):
     '''开始游戏'''
     f, info = game.start()
@@ -265,22 +264,22 @@ async def start(game: Game):
     await play_info(game)
 
 
-@app.on.state("room")
-@app.on.command("info", "信息")
+@app.on_state("room")
+@app.on_cmd("info", "信息")
 async def room_info(game: Game):
     '''展示房间信息'''
     await app.send(game.room_info)
 
 
-@app.on.state("play")
-@app.on.command("info", "信息")
+@app.on_state("play")
+@app.on_cmd("info", "信息")
 async def play_info(game: Game):
     '''展示当前牌、所有人筹码、报价'''
     await app.send(game.card_info + "\n" + game.player_info)
 
 
-@app.on.state("play")
-@app.on.text()
+@app.on_state("play")
+@app.on_text()
 async def quote(data: NumInput, game: Game):
     '''报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
     num = data.number

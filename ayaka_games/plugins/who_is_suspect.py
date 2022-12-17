@@ -6,11 +6,11 @@ from typing import List, Tuple
 from pydantic import Field
 from ayaka import AyakaApp, AyakaCache, AyakaLargeConfig
 from ayaka.extension import UserInput, singleton, run_in_startup
-from .utils import get_path
+from .data.utils import get_path
 
 
 def get_data():
-    path = get_path("data", "suspect.txt")
+    path = get_path("suspect.txt")
     with path.open("r", encoding="utf8") as f:
         lines = [line.strip() for line in f]
     return [line.split(" ") for line in lines if line]
@@ -249,8 +249,7 @@ async def check_friend(uid: int):
             return True
 
 
-@app.on.idle()
-@app.on.command("谁是卧底")
+@app.on_start_cmds("谁是卧底")
 async def app_entrance(game: Game):
     '''打开应用'''
     await app.start()
@@ -261,21 +260,21 @@ async def app_entrance(game: Game):
     await join(game)
 
 
-@app.on.state("room")
-@app.on.command("exit", "退出")
+@app.on_state("room")
+@app.on_cmd("exit", "退出")
 async def exit_room():
     '''关闭游戏'''
     await app.close()
 
 
-@app.on.state("play")
-@app.on.command("exit", "退出")
+@app.on_state("play")
+@app.on_cmd("exit", "退出")
 async def exit_play():
     await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
 
 
-@app.on.state("room")
-@app.on.command("join", "加入")
+@app.on_state("room")
+@app.on_cmd("join", "加入")
 async def join(game: Game):
     '''加入房间'''
     # 校验好友
@@ -287,8 +286,8 @@ async def join(game: Game):
     await app.send(info)
 
 
-@app.on.state("room")
-@app.on.command("leave", "离开")
+@app.on_state("room")
+@app.on_cmd("leave", "离开")
 async def leave(game: Game):
     '''离开房间'''
     f, info = game.leave(app.user_id)
@@ -298,8 +297,8 @@ async def leave(game: Game):
         await app.close()
 
 
-@app.on.state("room")
-@app.on.command("start", "begin", "开始")
+@app.on_state("room")
+@app.on_cmd("start", "begin", "开始")
 async def start(game: Game):
     '''开始游戏'''
     f, info = game.start()
@@ -314,23 +313,23 @@ async def start(game: Game):
         await app.bot.send_private_msg(user_id=p.uid, message=p.word)
 
 
-@app.on.state("room")
-@app.on.command("info", "信息")
+@app.on_state("room")
+@app.on_cmd("info", "信息")
 async def room_info(game: Game):
     '''展示房间内成员列表'''
     await app.send(game.room_info)
 
 
-@app.on.state("play")
-@app.on.command("info", "信息")
+@app.on_state("play")
+@app.on_cmd("info", "信息")
 async def play_info(game: Game):
     '''展示投票情况'''
     await app.send(game.players_state)
     await app.send(game.vote_info)
 
 
-@app.on.state("play")
-@app.on.command("vote", "投票")
+@app.on_state("play")
+@app.on_cmd("vote", "投票")
 async def vote(data: UserInput, game: Game):
     '''请at你要投票的对象，一旦投票无法更改'''
     if not data.user:

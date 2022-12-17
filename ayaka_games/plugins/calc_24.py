@@ -13,18 +13,18 @@ from pydantic import Field
 from ayaka import AyakaApp, AyakaCache, AyakaLargeConfig
 from ayaka.extension import singleton, run_in_startup
 from .bag import UserMoneyData
-from .utils import get_path
+from .data.utils import get_path
 
 
 def get_data_24():
-    path = get_path("data", "calc_24", "24.json")
+    path = get_path("calc_24", "24.json")
     with path.open("r", encoding="utf8") as f:
         data_24 = json.load(f)
     return data_24
 
 
 def get_data_48():
-    path = get_path("data", "calc_24", "48.json")
+    path = get_path("calc_24", "48.json")
     with path.open("r", encoding="utf8") as f:
         data_48 = json.load(f)
     return data_48
@@ -56,21 +56,17 @@ def register(app: AyakaApp, n: int):
         data = get_data()
         return list(data.keys())
 
-    @app.on.idle()
-    @app.on.command(f"{n}点")
+    @app.on_start_cmds(f"{n}点")
     async def _(cache: Question):
         '''启动游戏'''
         await app.start()
         await app.send(app.help)
         await set_q(cache)
 
-    @app.on.state()
-    @app.on.command("退出", "exit", "quit")
-    async def _():
-        await app.close()
+    app.set_start_cmds("退出", "exit", "quit")
 
-    @app.on.state()
-    @app.on.command("出题", "下一题", "next")
+    @app.on_state()
+    @app.on_cmd("出题", "下一题", "next")
     async def set_q(cache: Question):
         q = choice(get_questions())
         nums = q.split(" ")
@@ -79,16 +75,16 @@ def register(app: AyakaApp, n: int):
         cache.solution = solution
         await app.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
 
-    @app.on.state()
-    @app.on.command("题目", "查看题目", "查看当前题目", "当前题目", "question")
+    @app.on_state()
+    @app.on_cmd("题目", "查看题目", "查看当前题目", "当前题目", "question")
     async def _(cache: Question):
         nums = cache.nums
         solution = cache.solution
         q = " ".join(str(n) for n in nums)
         await app.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
 
-    @app.on.state()
-    @app.on.command("答案", "answer")
+    @app.on_state()
+    @app.on_cmd("答案", "answer")
     async def _(cache: Question):
         nums = cache.nums
         solution = cache.solution
@@ -101,8 +97,8 @@ def register(app: AyakaApp, n: int):
         await app.send(info)
         await set_q(cache)
 
-    @app.on.state()
-    @app.on.text()
+    @app.on_state()
+    @app.on_text()
     async def _(cache: Question):
         '''请使用正确的表达式，例如 (1+2)*(3+3)'''
         nums = cache.nums

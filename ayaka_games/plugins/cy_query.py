@@ -5,14 +5,14 @@ import json
 from pydantic import Field
 from ayaka import AyakaApp, AyakaInput, AyakaLargeConfig
 from ayaka.extension import singleton, run_in_startup
-from .utils import get_path
+from .data.utils import get_path
 
 app = AyakaApp("成语查询")
 app.help = '''有效提高群文学氛围'''
 
 
 def get_data():
-    path = get_path("data", "chengyu.json")
+    path = get_path("chengyu.json")
     with path.open("r", encoding="utf8") as f:
         chengyu_meaning_dict = json.load(f)
     return chengyu_meaning_dict
@@ -29,8 +29,8 @@ class WordInput(AyakaInput):
     word: str = Field(description="成语")
 
 
-@app.on.idle()
-@app.on.command("查询成语", "成语查询")
+@app.on_idle()
+@app.on_cmd("查询成语", "成语查询")
 async def handle(data: WordInput):
     word = data.word
     search_dict = Config().data

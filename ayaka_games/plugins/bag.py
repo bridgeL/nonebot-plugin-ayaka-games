@@ -22,8 +22,9 @@ class UserMoneyData(AyakaUserDB):
         return self.money
 
 
-@app.on.idle(True)
-@app.on.command("bag", "背包")
+@app.on_idle()
+@app.on_deep_all()
+@app.on_cmd("bag", "背包")
 async def show_bag(data: UserInput):
     # 有参数
     if data.user:
