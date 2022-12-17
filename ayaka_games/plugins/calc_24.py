@@ -63,7 +63,7 @@ def register(app: AyakaApp, n: int):
         await app.send(app.help)
         await set_q(cache)
 
-    app.set_start_cmds("退出", "exit", "quit")
+    app.set_close_cmds("退出", "exit", "quit")
 
     @app.on_state()
     @app.on_cmd("出题", "下一题", "next")
