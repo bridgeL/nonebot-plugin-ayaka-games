@@ -67,6 +67,7 @@ class ReminderCache(AyakaCache):
 
 @app.on_idle()
 @app.on_text()
+@app.on_no_block()
 async def check_reminder(reminder_manager: UserReminder):
     now = datetime.datetime.now()
     time = int(now.timestamp())

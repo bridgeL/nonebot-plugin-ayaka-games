@@ -113,12 +113,13 @@ def register(app: AyakaApp, n: int):
             await app.send(info)
             return
 
-        r = "正确！" if abs(r-n) < 0.1 else "错误"
-        await app.send(exp + "\n" + r)
         if abs(r-n) < 0.1:
+            await app.send(exp + "\n正确！")
             reward = Config().reward
             UserMoneyData.get(app.user_id).change(reward)
             await app.send(f"奖励{reward}金")
+        else:
+            await app.send(exp + "\错误")
 
 
 def pre_check(exp: str, nums: list):

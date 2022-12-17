@@ -33,6 +33,7 @@ url_matcher = re.compile(
 @app.on_idle()
 @app.on_deep_all()
 @app.on_text()
+@app.on_no_block()
 async def detect_card():
     for m in app.message:
         if m.type == "json":
@@ -59,6 +60,7 @@ async def detect_card():
 @app.on_idle()
 @app.on_deep_all()
 @app.on_text()
+@app.on_no_block()
 async def detect_url():
     data = app.event.get_plaintext()
     r = url_matcher.search(data)
