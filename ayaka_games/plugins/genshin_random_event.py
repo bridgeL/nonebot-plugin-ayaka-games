@@ -2,17 +2,16 @@
     原神随机事件
 '''
 from random import choice
-from typing import List, Literal, Union
-from pydantic import BaseModel, Field
-from ayaka import AyakaApp, AyakaInput, AyakaLargeConfig
+from typing import Literal
+from ayaka import AyakaBox, AyakaConfig,  BaseModel
 
-app = AyakaApp("原神随机事件")
+box = AyakaBox("原神随机事件")
 
 
 class Group(BaseModel):
     type: Literal["Group"] = "Group"
-    rules: List[str]
-    parts: List["Part"]
+    rules: list[str]
+    parts: list["Part"]
 
     def get_value(self, rule: str = None, data: dict = None):
         params = {k: p.choice() for p in self.parts for k in p.names}
@@ -32,8 +31,8 @@ class Group(BaseModel):
 
 class Part(BaseModel):
     type: Literal["Part"] = "Part"
-    names: List[str]
-    values: List[Union[str, Group]]
+    names: list[str]
+    values: list[str | Group]
 
     def choice(self):
         if not self.values:
@@ -78,9 +77,9 @@ helps = '''
 '''.strip().split("\n")
 
 
-class Config(AyakaLargeConfig):
-    __app_name__ = app.name
-    helps: List[str] = helps
+class Config(AyakaConfig):
+    __config_name__ = box.name
+    helps: list[str] = helps
     group: Group = default_group
 
 
@@ -95,14 +94,10 @@ def get_value():
     return config.group.get_value()
 
 
-class UserInput(AyakaInput):
-    event: str = Field("", description="自定义事件")
-
-
-@app.on_cmd("原神随机事件")
-async def _(data: UserInput):
-    event = data.event
+@box.on_cmd(cmds=["原神随机事件"])
+async def _():
+    event = str(box.arg)
     if event:
-        await app.send(get_value_with_custom_part("事件", event))
+        await box.send(get_value_with_custom_part("事件", event))
     else:
-        await app.send(get_value())
+        await box.send(get_value())

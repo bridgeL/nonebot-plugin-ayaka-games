@@ -1,16 +1,15 @@
 '''
     签到模块
 '''
-from pydantic import Field
-from ayaka import AyakaApp, AyakaInput, AyakaUserDB, AyakaConfig
 import datetime
-from .bag import UserMoneyData
+from ayaka import AyakaConfig, AyakaBox, AyakaUserDB
+from .bag import get_money
 
-app = AyakaApp('签到')
+box = AyakaBox('签到')
 
 
 class Config(AyakaConfig):
-    __app_name__ = app.name
+    __config_name__ = box.name
     reward_money: int = 10000
 
 
@@ -19,40 +18,26 @@ config = Config()
 
 class LastDate(AyakaUserDB):
     __table_name__ = "checkin"
-    last_date: str = ""
+    value: str = ""
 
 
-class UserInput(AyakaInput):
-    number: int = Field(description="至少为0", ge=0)
+@box.on_cmd(cmds=['checkin', '签到'])
+async def checkin():
+    last_date = LastDate.select_one(
+        group_id=box.group_id,
+        user_id=box.user_id
+    )
 
-
-@app.on_idle()
-@app.on_cmd("修改签到奖励")
-async def change_checkin(data: UserInput):
-    uids = app.ayaka_root_config.owners + app.ayaka_root_config.admins
-    if app.user_id not in uids:
-        await app.send("仅ayaka所有者或管理者可以修改此数值")
-        return
-
-    config.reward_money = data.number
-    await app.send("修改成功")
-
-
-@app.on_idle()
-@app.on_cmd('checkin', '签到')
-async def checkin(last: LastDate, usermoney: UserMoneyData):
     date = str(datetime.datetime.now().date())
-    name = app.user_name
-    uid = app.user_id
 
-    if date == last.last_date:
-        await app.send(f"[{name}] 今天已经签到过了")
+    if date == last_date.value:
+        await box.send(f"[{box.user_name}] 今天已经签到过了")
         return
 
-    last.last_date = date
-    last.save()
+    last_date.value = date
 
     # 签到奖励
-    money = usermoney.change(config.reward_money)
-    await app.send(f"[{name}] 签到成功，系统奖励 {config.reward_money}金")
-    await app.send(f"[{name}] 当前拥有 {money}金")
+    money = get_money(box.group_id, box.user_id)
+    money.value += config.reward_money
+    await box.send(f"[{box.user_name}] 签到成功，系统奖励 {config.reward_money}金")
+    await box.send(f"[{box.user_name}] 当前拥有 {money.value}金")

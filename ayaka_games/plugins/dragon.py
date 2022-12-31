@@ -2,34 +2,21 @@
     接龙，多个词库可选择
 '''
 import re
-from typing import Dict, List
 from random import choice
-from pydantic import BaseModel, Field
 from pypinyin import lazy_pinyin
-from ayaka.extension import singleton, run_in_startup, Timer
-from ayaka import AyakaApp, AyakaInput, AyakaLargeConfig, AyakaDB
-from .bag import UserMoneyData
-from .data.utils import get_path
+from ayaka import AyakaBox, singleton, run_in_startup, Timer, AyakaDB, AyakaConfig, BaseModel, Field
+from .bag import get_money
+from .data import load_data
 
-app = AyakaApp("接龙")
-app.help = '''接龙，在聊天时静默运行'''
-
-
-class UseInput(AyakaInput):
-    name: str = Field(description="词库名称")
-
-
-class AutoInput(AyakaInput):
-    name: str = Field(description="词库名称")
-    start: str = Field(description="开头词")
-    max_len: int = Field(10, description="最大接龙长度", gt=0)
+box = AyakaBox("接龙")
+help = '''接龙，在聊天时静默运行'''
 
 
 class Dragon(BaseModel):
     '''接龙词库'''
     name: str
-    words: List[str]
-    pinyin_dict: Dict[str, list] = {}
+    words: list[str]
+    pinyin_dict: dict[str, list] = {}
 
     def __init__(self, **data) -> None:
         super().__init__(**data)
@@ -51,7 +38,7 @@ class Dragon(BaseModel):
     def next(self, word: str):
         # 获取末字的拼音
         p = lazy_pinyin(word)[-1]
-        words: List[str] = self.pinyin_dict.get(p)
+        words: list[str] = self.pinyin_dict.get(p)
         if not words:
             return ""
         return choice(words)
@@ -69,8 +56,8 @@ class DragonUserData(AyakaDB):
     def get(cls, dragon_name: str):
         return cls.select_one(
             dragon_name=dragon_name,
-            group_id=app.group_id,
-            user_id=app.user_id
+            group_id=box.group_id,
+            user_id=box.user_id
         )
 
 
@@ -86,22 +73,14 @@ class DragonData(AyakaDB):
     def get(cls, dragon_name: str):
         return cls.select_one(
             dragon_name=dragon_name,
-            group_id=app.group_id
+            group_id=box.group_id
         )
 
 
 def get_dragon_list():
     with Timer("创建接龙配置文件"):
-        path = get_path("dragon", "成语.txt")
-        with path.open("r", encoding="utf8") as f:
-            lines = [line.strip() for line in f]
-        idiom_words = [line for line in lines if line]
-
-        path = get_path("dragon", "原神.txt")
-        with path.open("r", encoding="utf8") as f:
-            lines = [line.strip() for line in f]
-        genshin_words = [line for line in lines if line]
-
+        idiom_words = load_data("dragon", "成语.txt")
+        genshin_words = load_data("dragon", "原神.txt")
         return [
             Dragon(name="成语", words=idiom_words),
             Dragon(name="原神", words=genshin_words)
@@ -110,69 +89,69 @@ def get_dragon_list():
 
 @run_in_startup
 @singleton
-class Config(AyakaLargeConfig):
-    __app_name__ = app.name
+class Config(AyakaConfig):
+    __config_name__ = box.name
     reward: int = 1000
-    dragon_list: List[Dragon] = Field(default_factory=get_dragon_list)
+    dragon_list: list[Dragon] = Field(default_factory=get_dragon_list)
 
 
 zh = re.compile(r"[\u4e00-\u9fff]+")
 
 
-@app.on_text()
-@app.on_state(app.plugin_state, app.root_state)
-async def handle(usermoney: UserMoneyData):
-    text = app.event.get_plaintext()
+@box.on_text(states=["*", "idle"])
+async def handle():
+    text = box.event.get_plaintext()
     r = zh.search(text)
     if not r:
         return
 
+    word = r.group()
     config = Config()
 
-    word = r.group()
-    name = app.user_name
+    uid = box.user_id
+    name = box.user_name
     for dragon in config.dragon_list:
         dragon_data = DragonData.get(dragon.name)
 
-        if not dragon_data.use:
-            continue
+        # 接龙正在使用，且当前词语符合接龙词库
+        if dragon_data.use and dragon.check(word):
 
-        if not dragon.check(word):
-            continue
+            # 上次接龙
+            last = dragon_data.last
 
-        # 上次接龙
-        last = dragon_data.last
-        if last and word:
-            p1 = lazy_pinyin(last)[-1]
-            p2 = lazy_pinyin(word)[0]
-            if p1 == p2:
-                usermoney.change(config.reward)
-                await app.send(f"[{name}] 接龙成功！奖励{config.reward}金")
+            # 成功接龙
+            if last and word:
+                p1 = lazy_pinyin(last)[-1]
+                p2 = lazy_pinyin(word)[0]
+                if p1 == p2:
+                    # 修改金钱
+                    usermoney = get_money(
+                        group_id=box.group_id, user_id=box.user_id)
+                    usermoney.value += config.reward
+                    usermoney.save()
+                    await box.send(f"[{name}] 接龙成功！奖励{config.reward}金")
 
-                # 记录
-                user_data = DragonUserData.get(dragon.name)
-                user_data.cnt += 1
+                    # 修改记录
+                    user_data = DragonUserData.get(dragon.name)
+                    user_data.cnt += 1
+                    user_data.save()
 
-        word = dragon.next(word)
-        if word:
-            await app.send(word)
-            dragon_data.last = word
-        else:
-            await app.send(choice(["%$#*-_", "你赢了", "接不上来..."]))
-        break
-
-
-@app.on_start_cmds("接龙")
-async def app_entrance():
-    '''进入管理面板'''
-    await app.start()
-    await app.send(app.help)
-
-app.set_close_cmds("exit", "退出")
+            # 无论是否成功接龙都发送下一个词
+            word = dragon.next(word)
+            if word:
+                dragon_data.last = word
+                dragon_data.save()
+            else:
+                word = choice(["%$#*-_", "你赢了", "接不上来..."])
+            await box.send(word)
+            break
 
 
-@app.on_state()
-@app.on_cmd("list")
+box.set_start_cmds("接龙")
+box.set_close_cmds("exit", "退出")
+
+
+@box.on_cmd(cmds=["list"], states=["menu"])
 async def list_all():
     '''列出所有词库'''
     config = Config()
@@ -183,52 +162,49 @@ async def list_all():
             items.append(f"[{dragon.name}] 正在使用")
         else:
             items.append(f"[{dragon.name}]")
-    await app.send("\n".join(items))
+    await box.send("\n".join(items))
 
 
-@app.on_state()
-@app.on_cmd("use")
-async def use_dragon(data: UseInput):
+@box.on_cmd(cmds=["use"], states=["menu"])
+async def use_dragon():
     '''使用指定词库'''
     config = Config()
-    name = data.name
+    name = str(box.arg)
     for dragon in config.dragon_list:
         if dragon.name == name:
             break
     else:
-        await app.send(f"没有找到词库[{name}]")
+        await box.send(f"没有找到词库[{name}]")
         return
 
     dragon_data = DragonData.get(dragon.name)
     dragon_data.use = True
-    await app.send(f"已使用[{name}]")
+    await box.send(f"已使用[{name}]")
 
 
-@app.on_state()
-@app.on_cmd("unuse")
-async def unuse_dragon(data: UseInput):
+@box.on_cmd(cmds=["unuse"], states=["menu"])
+async def unuse_dragon():
     '''关闭指定词库'''
     config = Config()
-    name = data.name
+    name = str(box.arg)
 
     for dragon in config.dragon_list:
         if dragon.name == name:
             break
     else:
-        await app.send(f"没有找到词库[{name}]")
+        await box.send(f"没有找到词库[{name}]")
         return
 
     dragon_data = DragonData.get(dragon.name)
     dragon_data.use = False
-    await app.send(f"已停用[{name}]")
+    await box.send(f"已停用[{name}]")
 
 
-@app.on_state()
-@app.on_cmd("data")
+@box.on_cmd(cmds=["data"], states=["menu"])
 async def show_data():
     '''展示你的答题数据'''
-    gid = app.group_id
-    uid = app.user_id
+    gid = box.group_id
+    uid = box.user_id
 
     user_datas = DragonUserData.select_many(group_id=gid, user_id=uid)
 
@@ -240,17 +216,17 @@ async def show_data():
     else:
         info = "你还没有用过我...T_T"
 
-    await app.send(info)
+    await box.send(info)
 
 
-@app.on_state()
-@app.on_cmd("rank")
+@box.on_cmd(cmds=["rank"], states=["menu"])
 async def show_rank():
     '''展示排行榜'''
     config = Config()
-    data: Dict[str, List[DragonUserData]] = {}
+    data: dict[str, list[DragonUserData]] = {}
 
-    user_datas = DragonUserData.select_many(group_id=app.group_id)
+    # SELECT * from dragon_user_data ORDER BY dragon_name, cnt DESC
+    user_datas = DragonUserData.select_many(group_id=box.group_id)
     for user_data in user_datas:
         if user_data.dragon_name not in data:
             data[user_data.dragon_name] = []
@@ -264,7 +240,7 @@ async def show_rank():
         else:
             data[dragon.name] = []
 
-    users = await app.bot.get_group_member_list(group_id=app.group_id)
+    users = await box.bot.get_group_member_list(group_id=box.group_id)
     users = {u["user_id"]: u["card"] or u["nickname"] for u in users}
 
     info = "排行榜\n"
@@ -276,23 +252,22 @@ async def show_rank():
             datas.sort(key=lambda x: x.cnt, reverse=1)
             for d in datas[:5]:
                 info += f"  - [{users[d.user_id]}] 接龙次数 {d.cnt}\n"
-    await app.send(info.strip())
+    await box.send(info.strip())
 
 
-@app.on_state()
-@app.on_cmd("auto")
-async def auto_dragon(data: AutoInput):
+@box.on_cmd(cmds=["auto"], states=["menu"])
+async def auto_dragon():
     '''使用指定词库和起始点自动接龙n个'''
     config = Config()
-    name = data.name
-    word = data.start
-    max_len = data.max_len
+    name = box.args[0]
+    word = box.args[1]
+    max_len = box.args[2]
 
     for dragon in config.dragon_list:
         if dragon.name == name:
             break
     else:
-        await app.send(f"没有找到词库[{name}]")
+        await box.send(f"没有找到词库[{name}]")
         return
 
     info = word
@@ -304,4 +279,4 @@ async def auto_dragon(data: AutoInput):
             info += info[-1]*3 + "%.$#*-_ 接不动了喵o_O"
             break
 
-    await app.send(info)
+    await box.send(info)

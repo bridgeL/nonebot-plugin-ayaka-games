@@ -3,48 +3,31 @@
   
     尽管已有所限制，但不保证代码已排除了所有注入风险！！
 '''
-
-import ast
-import json
 import re
-from typing import List, Dict
+import ast
 from random import choice
-from pydantic import Field
-from ayaka import AyakaApp, AyakaCache, AyakaLargeConfig
-from ayaka.extension import singleton, run_in_startup
-from .bag import UserMoneyData
-from .data.utils import get_path
-
-
-def get_data_24():
-    path = get_path("calc_24", "24.json")
-    with path.open("r", encoding="utf8") as f:
-        data_24 = json.load(f)
-    return data_24
-
-
-def get_data_48():
-    path = get_path("calc_24", "48.json")
-    with path.open("r", encoding="utf8") as f:
-        data_48 = json.load(f)
-    return data_48
+from ayaka import AyakaBox, AyakaConfig, singleton, run_in_startup, BaseModel, Field
+from .bag import get_money
+from .data import load_data
 
 
 @run_in_startup
 @singleton
-class Config(AyakaLargeConfig):
-    __app_name__ = "24点"
+class Config(AyakaConfig):
+    __config_name__ = "24点"
     reward: int = 1000
-    data_24: Dict[str, dict] = Field(default_factory=get_data_24)
-    data_48: Dict[str, dict] = Field(default_factory=get_data_48)
+    data_24: dict[str, dict] = Field(
+        default_factory=lambda: load_data("calc_24", "24.json"))
+    data_48: dict[str, dict] = Field(
+        default_factory=lambda: load_data("calc_24", "48.json"))
 
 
-class Question(AyakaCache):
-    nums: List[int] = []
+class Question(BaseModel):
+    nums: list[int] = []
     solution: dict = {}
 
 
-def register(app: AyakaApp, n: int):
+def register(box: AyakaBox, n: int):
     if n == 24:
         def get_data():
             return Config().data_24
@@ -56,70 +39,72 @@ def register(app: AyakaApp, n: int):
         data = get_data()
         return list(data.keys())
 
-    @app.on_start_cmds(f"{n}点")
-    async def _(cache: Question):
+    @box.on_cmd(cmds=[f"{n}点"])
+    async def _():
         '''启动游戏'''
-        await app.start()
-        await app.send(app.help)
-        await set_q(cache)
+        await box.start("run")
+        await box.send(box.help)
+        await set_q()
 
-    app.set_close_cmds("退出", "exit", "quit")
+    box.set_close_cmds("退出", "exit", "quit")
 
-    @app.on_state()
-    @app.on_cmd("出题", "下一题", "next")
-    async def set_q(cache: Question):
+    @box.on_cmd(cmds=["出题", "下一题", "next"], states=["run"])
+    async def set_q():
+        cache = box.get_data(Question)
         q = choice(get_questions())
         nums = q.split(" ")
         solution = get_data()[q]
         cache.nums = [int(n) for n in nums]
         cache.solution = solution
-        await app.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
+        await box.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
 
-    @app.on_state()
-    @app.on_cmd("题目", "查看题目", "查看当前题目", "当前题目", "question")
-    async def _(cache: Question):
+    @box.on_cmd(cmds=["题目", "查看题目", "查看当前题目", "当前题目", "question"], states=["run"])
+    async def _():
+        cache = box.get_data(Question)
         nums = cache.nums
         solution = cache.solution
         q = " ".join(str(n) for n in nums)
-        await app.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
+        await box.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
 
-    @app.on_state()
-    @app.on_cmd("答案", "answer")
-    async def _(cache: Question):
+    @box.on_cmd(cmds=["答案", "answer"], states=["run"])
+    async def _():
+        cache = box.get_data(Question)
         nums = cache.nums
         solution = cache.solution
 
         if not nums:
-            await app.send("请先出题")
+            await box.send("请先出题")
             return
 
         info = "\n".join(solution.values())
-        await app.send(info)
-        await set_q(cache)
+        await box.send(info)
+        await set_q()
 
-    @app.on_state()
-    @app.on_text()
-    async def _(cache: Question):
+    @box.on_text(states=["run"])
+    async def _():
         '''请使用正确的表达式，例如 (1+2)*(3+3)'''
+        cache = box.get_data(Question)
         nums = cache.nums
         if not nums:
             return
 
         try:
-            exp = app.event.get_plaintext()
+            exp = box.event.get_plaintext()
             exp, r = deal(exp, nums)
         except Exception as e:
             code, info = e.args
-            await app.send(info)
+            await box.send(info)
             return
 
         if abs(r-n) < 0.1:
-            await app.send(exp + "\n正确！")
+            await box.send(exp + "\n正确！")
             reward = Config().reward
-            UserMoneyData.get(app.user_id).change(reward)
-            await app.send(f"奖励{reward}金")
+            money = get_money(group_id=box.group_id, user_id=box.user_id)
+            money.value += reward
+            money.save()
+            await box.send(f"奖励{reward}金")
         else:
-            await app.send(exp + "\错误")
+            await box.send(exp + "\错误")
 
 
 def pre_check(exp: str, nums: list):
@@ -269,10 +254,10 @@ def deal(exp, nums):
     return exp, r
 
 
-app_1 = AyakaApp("24点")
-app_1.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出24点"
-register(app_1, 24)
+box_1 = AyakaBox("24点")
+box_1.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出24点"
+register(box_1, 24)
 
-app_2 = AyakaApp("48点")
-app_2.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出48点"
-register(app_2, 48)
+box_2 = AyakaBox("48点")
+box_2.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出48点"
+register(box_2, 48)

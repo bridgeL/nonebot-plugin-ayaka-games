@@ -1,40 +1,32 @@
 '''
     成语查询
 '''
-import json
-from pydantic import Field
-from ayaka import AyakaApp, AyakaInput, AyakaLargeConfig
-from ayaka.extension import singleton, run_in_startup
-from .data.utils import get_path
+from ayaka import AyakaBox, AyakaConfig, run_in_startup, Field
+from .data import load_data
 
-app = AyakaApp("成语查询")
-app.help = '''有效提高群文学氛围'''
+box = AyakaBox("成语查询")
+# box.help = '''有效提高群文学氛围'''
 
 
-def get_data():
-    path = get_path("chengyu.json")
-    with path.open("r", encoding="utf8") as f:
-        chengyu_meaning_dict = json.load(f)
-    return chengyu_meaning_dict
+class Config(AyakaConfig):
+    __config_name__ = box.name
+    words: dict = Field(default_factory=lambda: load_data("chengyu.json"))
+
+
+config: Config = None
 
 
 @run_in_startup
-@singleton
-class Config(AyakaLargeConfig):
-    __app_name__ = app.name
-    data: dict = Field(default_factory=get_data)
+async def init():
+    global config
+    config = Config()
 
 
-class WordInput(AyakaInput):
-    word: str = Field(description="成语")
-
-
-@app.on_idle()
-@app.on_cmd("查询成语", "成语查询")
-async def handle(data: WordInput):
-    word = data.word
-    search_dict = Config().data
+@box.on_cmd(cmds=["查询成语", "成语查询"])
+async def handle():
+    word = box.arg.extract_plain_text()
+    search_dict = config.words
     if word in search_dict:
-        await app.send(search_dict[word])
+        await box.send(search_dict[word])
     else:
-        await app.send("没有找到相关信息")
+        await box.send("没有找到相关信息")

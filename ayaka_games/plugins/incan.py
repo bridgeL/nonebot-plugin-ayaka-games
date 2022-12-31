@@ -1,10 +1,9 @@
-from typing import List
 from enum import Enum
 from random import randint, choice, shuffle
-from ayaka import AyakaApp, AyakaCache
+from ayaka import AyakaBox
 
-app = AyakaApp("incan")
-app.help = "欢迎使用印加宝藏2.0"
+box = AyakaBox("incan")
+# box.help = "欢迎使用印加宝藏2.0"
 
 ruledoc = '''1. 前进，玩家翻开一张卡牌
 2. 撤退，玩家沿着来时的路径原路返回
@@ -95,7 +94,7 @@ class Card:
 
 class Deck:
     def __init__(self, ctype='Quest'):
-        self.cardset: List[Card] = []
+        self.cardset: list[Card] = []
         if ctype == 'Quest':
             for i in range(5):
                 self.cardset.append(
@@ -142,16 +141,9 @@ class Deck:
         return card
 
 
-class Incan(AyakaCache):
-    members: dict = {}
-    round: int = 0
-    route: List[Card] = []
-    deck: Deck = Deck()
-    monsters: list = []
-    artifact: int = 0
-    acquiredArtifact: int = 0
-    turn: int = 0
-    temples: Deck = Deck('Temple')
+class Incan:
+    def __init__(self) -> None:
+        self.reset()
 
     def reset(self):
         self.members = {}
@@ -192,8 +184,8 @@ async def EnterNextRound(model: Incan):
     if model.round == 5:
         return await Clearing(model)
     else:
-        await app.send(f'第{model.round}轮结束')
-        await app.send(f'第{model.round+1}轮：{model.temples.Draw().name}')
+        await box.send(f'第{model.round}轮结束')
+        await box.send(f'第{model.round+1}轮：{model.temples.Draw().name}')
 
 
 async def Clearing(model: Incan):
@@ -226,12 +218,12 @@ async def Clearing(model: Incan):
             trophy = []
             for name, jewel in model.members[uid]['income'].items():
                 trophy.append(f'<{name}>{jewel["number"]}枚')
-            await app.send(f'<{model.members[uid]["name"]}>带着{", ".join(trophy)}获得了胜利')
-            await app.send('游戏结束~')
+            await box.send(f'<{model.members[uid]["name"]}>带着{", ".join(trophy)}获得了胜利')
+            await box.send('游戏结束~')
 
     else:
-        await app.send('有勇气才能获得宝石哦！')
-        await app.send('游戏结束~')
+        await box.send('有勇气才能获得宝石哦！')
+        await box.send('游戏结束~')
 
     return True
 
@@ -253,11 +245,11 @@ async def DoRetreat(model: Incan):
         card.number = card.number % num
 
     names = ",".join(f'<{model.members[uid]["name"]}>' for uid in runaways)
-    await app.send(f'{names}放弃了冒险')
+    await box.send(f'{names}放弃了冒险')
 
 
 async def send_info(turn, result, tips_giver, tips):
-    await app.send(f'第{turn}回合, {result}\n<{tips_giver}> {tips}')
+    await box.send(f'第{turn}回合, {result}\n<{tips_giver}> {tips}')
 
 
 async def Gaming(model: Incan):
@@ -315,88 +307,89 @@ async def Gaming(model: Incan):
         return await EnterNextRound(model)
 
 
-@app.on_start_cmds("incan", "印加")
-async def game_entrance(model: Incan):
+@box.on_cmd(cmds=["incan", "印加"])
+async def game_entrance():
     '''打开应用'''
-    await app.start("room")
+    await box.start("room")
 
     # 初始化模型
+    model: Incan = box.get_arbitrary_data("model", Incan)
     model.reset()
 
     # 操作
-    InitPlayer(model, app.user_id, app.user_name)
-    await app.send(app.help)
+    InitPlayer(model, box.user_id, box.user_name)
+    await box.send(ruledoc)
 
 
-@app.on_close_cmds('exit', 'quit', "退出")
+@box.on_cmd(cmds=['exit', 'quit', "退出"], states=["*"])
 async def exit_incan():
     '''退出游戏'''
-    app.remove_listener()
-    await app.send('游戏结束~下次再见~')
-    await app.close()
+    box.remove_listener()
+    await box.send('游戏结束~下次再见~')
+    await box.close()
 
 
-@app.on_state("gaming")
-@app.on_cmd('go', 'forward')
-async def handle(model: Incan):
+@box.on_cmd(cmds=['go', 'forward'], states=["gaming"])
+async def go_handle():
     '''前进'''
-    uid = app.user_id
+    model: Incan = box.cache["model"]
+    uid = box.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 1
     if await Gaming(model):
         await exit_incan()
 
 
-@app.on_state("gaming")
-@app.on_cmd('back', 'retreat', 'escape')
-async def handle(model: Incan):
+@box.on_cmd(cmds=['back', 'retreat', 'escape'], states=["gaming"])
+async def handle():
     '''撤退'''
-    uid = app.user_id
+    model: Incan = box.cache["model"]
+    uid = box.user_id
     if model.members[uid]['status'] == 0:
         model.members[uid]['status'] = 2
     if await Gaming(model):
         await exit_incan()
 
 
-@app.on_state("room")
-@app.on_cmd('start', 'run')
-async def handle(model: Incan):
+@box.on_cmd(cmds=['start', 'run'], states=["room"])
+async def handle():
     '''开始游戏'''
-    await app.goto("gaming")
+    model: Incan = box.cache["model"]
+    await box.set_state("gaming")
 
-    await app.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
-    await app.send(f'第1轮：{model.temples.Draw().name}')
+    await box.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
+    await box.send(f'第1轮：{model.temples.Draw().name}')
 
     for uid in model.members:
-        app.add_listener(uid)
+        box.add_listener(uid)
 
 
-@app.on_state("room")
-@app.on_cmd("join")
-async def handle(model: Incan):
+@box.on_cmd(cmds=["join"], states=["room"])
+async def handle():
     '''加入游戏'''
-    name = app.event.sender.card if app.event.sender.card else app.event.sender.nickname
-    uid = app.user_id
+    model: Incan = box.cache["model"]
+    name = box.event.sender.card if box.event.sender.card else box.event.sender.nickname
+    uid = box.user_id
 
     if uid in model.members:
-        await app.send(f'{name}已经在小队中了，无需重复加入')
+        await box.send(f'{name}已经在小队中了，无需重复加入')
     else:
         InitPlayer(model, uid, name)
-        await app.send(f'<{name}>加入了小队，当前小队共{len(model.members)}人。')
+        await box.send(f'<{name}>加入了小队，当前小队共{len(model.members)}人。')
 
 
-@app.on_state("room")
-@app.on_cmd("status", "状态")
-async def handle(model: Incan):
+@box.on_cmd(cmds=["status", "状态"], states=["room"])
+async def handle():
     '''查看状态'''
+    model: Incan = box.cache["model"]
     ans = f'队伍玩家有：<{">, <".join([model.members[uid]["name"] for uid in model.members])}>'
-    await app.send(ans)
+    await box.send(ans)
 
 
-@app.on_state("gaming")
-@app.on_cmd("status", "状态")
-async def handle(model: Incan):
+@box.on_cmd(cmds=["status", "状态"], states=["gaming"])
+async def handle():
     '''查看状态'''
+    model: Incan = box.cache["model"]
 
     def get_state_s(uid):
         if model.members[uid]['status'] == 0:
@@ -415,12 +408,10 @@ async def handle(model: Incan):
     else:
         status += f'目前没有收到任何警告'
 
-    await app.send(status)
+    await box.send(status)
 
 
-@app.on_state()
-@app.on_deep_all()
-@app.on_cmd('rule', 'document', 'doc')
+@box.on_cmd(cmds=['rule', 'document', 'doc'], states=["*"])
 async def handle():
     '''查看规则'''
-    await app.send(ruledoc)
+    await box.send(ruledoc)

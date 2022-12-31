@@ -3,11 +3,10 @@
 '''
 from asyncio import sleep
 from random import choice
-from typing import Dict
-from ayaka import AyakaApp, AyakaCache
+from ayaka import AyakaBox
 
-app = AyakaApp("加一秒")
-app.help = '''
+box = AyakaBox("加一秒")
+help = '''
 每人初始时间值为0
 每有3个不同的人执行一次或若干次加1，boss就会完成蓄力，吸取目前时间值最高的人的时间，如果有多人，则都被吸取
 boss时间值>=17时，游戏结束，boss将带走所有比他时间值高的人，剩余人中时间值最高的获胜，世界重启
@@ -29,12 +28,12 @@ restarts = [
 
 
 async def get_user_data():
-    users = await app.bot.get_group_member_list(group_id=app.group_id)
+    users = await box.bot.get_group_member_list(group_id=box.group_id)
     user_data = {u["user_id"]: u["card"] or u["nickname"] for u in users}
     return user_data
 
 
-def get_max(data: Dict[int, int]):
+def get_max(data: dict[int, int]):
     '''
         data 是保存了 uid-time 数据的字典
     '''
@@ -154,9 +153,9 @@ class Boss:
         return info
 
 
-class Game(AyakaCache):
-    player_group: PlayerGroup = None
-    boss: Boss = None
+class Game:
+    def __init__(self) -> None:
+        self.reset()
 
     def reset(self) -> None:
         self.player_group = PlayerGroup()
@@ -177,41 +176,42 @@ class Game(AyakaCache):
         return get_max(data)
 
 
-@app.on_start_cmds("加一秒")
-async def app_start(game: Game):
+@box.on_cmd(cmds=["加一秒"])
+async def box_start():
     '''启动游戏'''
+    game: Game = box.get_arbitrary_data("game", Game)
     if not game.boss:
         game.reset()
-    await app.start()
-    await app.send(app.help)
+    await box.start()
+    await box.send(help)
 
 
-@app.on_close_cmds("exit", "退出")
-async def app_close():
+@box.on_cmd(cmds=["exit", "退出"], states=["*"])
+async def box_close():
     '''退出游戏（数据保留）'''
-    await app.send("数据已保存")
-    await app.close()
+    await box.send("数据已保存")
+    await box.close()
 
 
-@app.on_state()
-@app.on_cmd("我的")
-async def inquiry(game: Game):
+@box.on_cmd(cmds=["我的"], states=["menu"])
+async def inquiry():
     '''查看你目前的时间'''
-    time = game.player_group.get_time(app.user_id)
-    await app.send(f"[{app.user_name}]目前的时间：{time}")
+    game: Game = box.get_arbitrary_data("game")
+    time = game.player_group.get_time(box.user_id)
+    await box.send(f"[{box.user_name}]目前的时间：{time}")
 
 
-@app.on_state()
-@app.on_cmd("boss")
-async def inquiry_boss(game: Game):
+@box.on_cmd(cmds=["boss"], states=["menu"])
+async def inquiry_boss():
     '''查看boss的时间和能量'''
-    await app.send(game.boss.state)
+    game: Game = box.get_arbitrary_data("game")
+    await box.send(game.boss.state)
 
 
-@app.on_state()
-@app.on_cmd("全部")
-async def inquiry_all(game: Game):
+@box.on_cmd(cmds=["全部"], states=["menu"])
+async def inquiry_all():
     '''查看所有人参与情况，以及boss的时间和能量'''
+    game: Game = box.get_arbitrary_data("game")
     # boss
     info = game.boss.state
 
@@ -219,7 +219,7 @@ async def inquiry_all(game: Game):
     data = game.player_group.data
 
     if not data:
-        await app.send(info)
+        await box.send(info)
         return
 
     # 查找名字
@@ -227,21 +227,21 @@ async def inquiry_all(game: Game):
 
     for uid, time in data.items():
         info += f"\n[{user_data[uid]}]目前的时间：{time}"
-    await app.send(info)
+    await box.send(info)
 
 
-@app.on_state()
-@app.on_cmd("加1", "加一", "+1", "+1s")
-async def plus(game: Game):
+@box.on_cmd(cmds=["加1", "加一", "+1", "+1s"], states=["menu"])
+async def plus():
     '''让你的时间+1'''
+    game: Game = box.get_arbitrary_data("game")
 
     # 玩家
-    time = game.player_group.change_time(app.user_id, 1)
-    await app.send(f"[{app.user_name}]的时间增加了！目前为：{time}")
+    time = game.player_group.change_time(box.user_id, 1)
+    await box.send(f"[{box.user_name}]的时间增加了！目前为：{time}")
 
     # boss
-    game.boss.add_power(app.user_id)
-    await app.send(game.boss.state)
+    game.boss.add_power(box.user_id)
+    await box.send(game.boss.state)
 
     # boss 能量不够
     if game.boss.power < game.boss.max_power:
@@ -250,13 +250,13 @@ async def plus(game: Game):
     # boss 攻击
     uids = game.boss.kill(game.player_group.data)
 
-    await app.send("boss发动了攻击...")
+    await box.send("boss发动了攻击...")
     await sleep(2)
-    await app.send("...")
+    await box.send("...")
     await sleep(2)
 
     if not uids:
-        await app.send("无事发生")
+        await box.send("无事发生")
         return
 
     # 查找名字
@@ -265,8 +265,8 @@ async def plus(game: Game):
     # 告知被攻击情况
     items = [f"[{user_data[uid]}] {choice(feelings)}" for uid in uids]
     info = "\n".join(items)
-    await app.send(info)
-    await inquiry_all(game)
+    await box.send(info)
+    await inquiry_all()
 
     # boss 时间不够
     if game.boss.time < game.boss.max_time:
@@ -274,9 +274,9 @@ async def plus(game: Game):
 
     # 游戏结束
     await sleep(2)
-    await app.send(f"boss的时间超越了世界的界限，{choice(restarts)}...")
+    await box.send(f"boss的时间超越了世界的界限，{choice(restarts)}...")
     await sleep(2)
-    await app.send("...")
+    await box.send("...")
     await sleep(2)
 
     # 带走时间过高的玩家
@@ -285,7 +285,7 @@ async def plus(game: Game):
 
     if items:
         info = f"boss带走了所有时间高于它的玩家：" + "、".join(items)
-        await app.send(info)
+        await box.send(info)
 
     # 告知胜利者
     uids = game.get_winners()
@@ -297,7 +297,7 @@ async def plus(game: Game):
         info = "、".join(items)
 
     info = "在上一个世界中：" + info + "是最终的赢家！"
-    await app.send(info)
+    await box.send(info)
 
     game.player_group.clear_all()
     game.boss.time = 0

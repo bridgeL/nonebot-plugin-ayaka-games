@@ -1,30 +1,21 @@
-from random import randint
-from ayaka import AyakaApp, AyakaInput, AyakaUserDB, AyakaGroupDB
-from pydantic import Field
 from asyncio import sleep
-from .bag import UserMoneyData
+from random import randint
+from ayaka import AyakaBox, Numbers, AyakaGroupDB, AyakaUserDB
+from .bag import get_money
 
 god_names = ['欢愉', '悼亡', '深渊', '智慧']
 
-app = AyakaApp('mana')
-app.help = '''
+box = AyakaBox('mana')
+help = '''
 ===== m a n a =====
 欢愉、悼亡、深渊、智慧
 ===== ======= =====
-'''
-
-
-class ManaInput(AyakaInput):
-    number: int = Field(0, description="正数为买入，负数为卖出，0为查询")
-
-
-class PrayInput(AyakaInput):
-    number: int = Field(description="至少花费1", ge=1)
+'''.strip()
 
 
 class ManaGod(AyakaGroupDB):
     __table_name__ = "mana_god"
-    name: str = '欢愉'
+    name: str = "欢愉"
     power: int = 1
     cnt: int = 0
     mana: int = 0
@@ -52,14 +43,20 @@ class ManaGod(AyakaGroupDB):
         return f"{r} {c} {self.power}"
 
 
+def get_mana_god(group_id: int,):
+    return ManaGod.select_one(group_id=group_id)
+
+
 class UserMana(AyakaUserDB):
     __table_name__ = "user_mana"
     mana: int = 10
 
-    def change(self, diff):
-        self.mana += diff
-        self.save()
-        return self.mana
+
+def get_user_mana(group_id: int, user_id: int):
+    return UserMana.select_one(
+        group_id=group_id,
+        user_id=user_id
+    )
 
 
 def change_god(god_name: str, god: ManaGod):
@@ -162,44 +159,47 @@ def wise(god: ManaGod, mana: int):
     return reward, "宇宙的奥秘在命途中盘旋"
 
 
-app.set_start_cmds("mana", "玛娜")
-app.set_close_cmds("exit", "退出")
+box.set_start_cmds("mana", "玛娜")
+box.set_close_cmds("exit", "退出")
 
 
-@app.on_state()
-@app.on_cmd('divine', '占卜')
-async def pray(data: UserMana, god: ManaGod):
+@box.on_cmd(cmds=['divine', '占卜'])
+async def pray():
     '''<数字> 花费1玛娜，祈求神的回应'''
-    name = app.user_name
+    usermana = get_user_mana(box.group_id, box.user_id)
+    god = get_mana_god(box.group_id)
 
-    mana = data.mana
+    name = box.user_name
+
+    mana = usermana.mana
     if mana <= 0:
-        await app.send(f"[{name}] 没有玛娜")
+        await box.send(f"[{name}] 没有玛娜")
         return
 
-    data.mana -= 1
-    data.save()
+    usermana.mana -= 1
 
-    await app.send(f"[{name}] 花费了 1玛娜，聆听星辰的呓语")
+    await box.send(f"[{name}] 花费了 1玛娜，聆听星辰的呓语")
     await sleep(1)
-    await app.send(f"...")
+    await box.send(f"...")
     await sleep(1)
-    await app.send(f"...")
+    await box.send(f"...")
     await sleep(1)
 
-    await app.send(god.say())
+    await box.send(god.say())
 
 
-@app.on_state()
-@app.on_cmd('pray', '祈祷')
-async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
+@box.on_cmd(cmds=['pray', '祈祷'])
+async def handle(nums=Numbers("请输入一个数字")):
     '''花费n玛娜，感受神的呼吸'''
-    arg = data.number
-    name = app.user_name
+    usermana = get_user_mana(box.group_id, box.user_id)
+    god = get_mana_god(box.group_id)
+
+    arg = int(nums[0])
+    name = box.user_name
 
     mana = usermana.mana
     if mana < arg:
-        await app.send(f"[{name}] 只有 {mana}玛娜")
+        await box.send(f"[{name}] 只有 {mana}玛娜")
         return
 
     funcs = {
@@ -214,32 +214,29 @@ async def handle(data: PrayInput, god: ManaGod, usermana: UserMana):
     func = funcs[god.name]
     reward, info = func(god=god, mana=arg)
     reward = int(reward)
-    await app.send(info)
-
-    god.save()
-
+    await box.send(info)
     usermana.mana += reward - arg
-    usermana.save()
     mana = usermana.mana
-    await app.send(f"[{name}] 花费了 {arg}玛娜，获得了 {reward}玛娜")
-    await app.send(f"[{name}] 当前有 {mana}玛娜")
+    await box.send(f"[{name}] 花费了 {arg}玛娜，获得了 {reward}玛娜")
+    await box.send(f"[{name}] 当前有 {mana}玛娜")
 
     if old_god_name != god.name:
-        await app.send("星空在惊惧中震颤，旧的命途陨落，新的命途执掌星空")
-        await app.send(god.say())
+        await box.send("星空在惊惧中震颤，旧的命途陨落，新的命途执掌星空")
+        await box.send(god.say())
 
 
-@app.on_state()
-@app.on_cmd("mana")
-async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoneyData):
-    num = data.number
-    name = app.user_name
+@box.on_cmd(cmds=["mana"])
+async def handle(nums=Numbers("请输入一个数字")):
+    usermana = get_user_mana(box.group_id, box.user_id)
+    usermoney = get_money(box.group_id, box.user_id)
+    num = int(nums[0])
+    name = box.user_name
 
     mana = usermana.mana
-    money = usermoney.money
+    money = usermoney.value
 
     if num == 0:
-        await app.send(f"[{name}] 当前持有 {mana}个玛娜")
+        await box.send(f"[{name}] 当前持有 {mana}个玛娜")
         return
 
     # 买mana
@@ -251,17 +248,21 @@ async def handle(data: ManaInput, usermana: UserMana, usermoney: UserMoneyData):
 
     if action == "购买":
         if money < num*1000:
-            await app.send(f"[{name}] 只有{money}个金币")
+            await box.send(f"[{name}] 只有{money}个金币")
             return
         else:
-            money = usermoney.change(-num*1000)
-            mana = usermana.change(num)
+            usermoney.value -= num*1000
+            money = usermoney.value
+            usermana.mana += num
+            mana = usermana.mana
     else:
         if mana < num:
-            await app.send(f"[{name}] 只有{mana}个玛娜")
+            await box.send(f"[{name}] 只有{mana}个玛娜")
             return
         else:
-            money = usermoney.change(num*1000)
-            mana = usermana.change(-num)
+            usermoney.value += num*1000
+            money = usermoney.value
+            usermana.mana -= num
+            mana = usermana.mana
 
-    await app.send(f"[{name}] {action}玛娜成功，当前持有 {money}个金币，{mana}个玛娜")
+    await box.send(f"[{name}] {action}玛娜成功，当前持有 {money}个金币，{mana}个玛娜")

@@ -3,20 +3,13 @@
 '''
 from asyncio import sleep
 from random import randint
-from typing import List
-from pydantic import Field
-from ayaka import AyakaApp, AyakaInput, AyakaCache
+from ayaka import AyakaBox, Numbers
 
-app = AyakaApp("抢30")
-app.help = '''
-至少2人游玩，一局内进行多轮叫牌，谁最先达到或超过30点谁获胜
-总共52张牌，直到全部用完后才会洗牌，只要不退出游戏，下局的牌库将继承上局
-首轮所有人筹码为10，每轮所有人筹码+1
-'''
-
-
-class NumInput(AyakaInput):
-    number: int = Field(description="至少为0", ge=0)
+box = AyakaBox("抢30")
+help = '''至少2人游玩，每人开局10个筹码，每轮自增1个
+每轮从52张牌中抽取一张（不放回），所有人按轮次使用筹码参与竞价，出价最高的人获得此牌对应的点数
+重复多轮，谁的点数先达到30点，谁获胜
+52张牌直到用尽后才会洗牌，且只要不退出游戏，下局的牌库将继承上局'''
 
 
 class Player:
@@ -43,16 +36,12 @@ def shuffle(array: list):
     return result
 
 
-class Game(AyakaCache):
-    players: List[Player] = []
-    cards: List[int] = []
-    first: int = -1
-    i: int = 0
-    card: int = 0
-    last_quote: int = -1
+class Game:
+    def __init__(self) -> None:
+        self.reset()
 
     def reset(self):
-        self.players = []
+        self.players: list[Player] = []
         self.cards = []
         self.first = -1
         self.i = 0
@@ -202,95 +191,89 @@ class Game(AyakaCache):
         return "\n".join(items)
 
 
-@app.on_start_cmds("抢30")
-async def app_entrance(game: Game):
+@box.on_cmd(cmds=["抢30"])
+async def box_entrance():
     '''打开游戏'''
-    await app.start()
-    await app.send(app.help)
-    await app.goto("room")
-    await app.send(app.help)
+    await box.start("room")
+    await box.send(help)
 
+    game = box.cache.get("game", Game())
     game.reset()
-    f, info = game.join(app.user_id, app.user_name)
-    await app.send(info)
+    box.cache["game"] = game
+    f, info = game.join(box.user_id, box.user_name)
+    await box.send(info)
+
+box.set_close_cmds("关闭", "close")
 
 
-@app.on_state("room")
-@app.on_cmd("exit", "退出")
-async def exit_room():
-    '''关闭游戏'''
-    await app.close()
+@box.on_cmd(cmds=["help", "帮助"], states=["*"])
+async def send_help():
+    await box.send(help)
 
 
-@app.on_state("play")
-@app.on_cmd("exit", "退出")
-async def exit_play():
-    '''退出游戏'''
-    await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
-
-
-@app.on_state("room")
-@app.on_cmd("join", "加入")
-async def join(game: Game):
+@box.on_cmd(cmds=["join", "加入"], states=["room"])
+async def join():
     '''加入房间'''
-    f, info = game.join(app.user_id, app.user_name)
-    await app.send(info)
+    game: Game = box.cache["game"]
+    f, info = game.join(box.user_id, box.user_name)
+    await box.send(info)
 
 
-@app.on_state("room")
-@app.on_cmd("leave", "离开")
-async def leave(game: Game):
+@box.on_cmd(cmds=["leave", "离开"], states=["room"])
+async def leave():
     '''离开房间'''
-    f, info = game.leave(app.user_id)
-    await app.send(info)
+    game: Game = box.cache["game"]
+    f, info = game.leave(box.user_id)
+    await box.send(info)
 
     if f and game.player_cnt == 0:
-        await app.close()
+        await box.reset_state()
+        await box.send("抢30已关闭")
 
 
-@app.on_state("room")
-@app.on_cmd("start", "begin", "开始")
-async def start(game: Game):
+@box.on_cmd(cmds=["start", "begin", "开始"], states=["room"])
+async def start():
     '''开始游戏'''
+    game: Game = box.cache["game"]
     f, info = game.start()
-    await app.send(info)
+    await box.send(info)
 
     # 启动失败
     if not f:
         return
 
-    await app.goto("play")
+    await box.set_state("play")
     game.round_begin()
-    await play_info(game)
+    await play_info()
 
 
-@app.on_state("room")
-@app.on_cmd("info", "信息")
-async def room_info(game: Game):
+@box.on_cmd(cmds=["info", "信息", "房间", "room", "房间信息"], states=["room"])
+async def room_info():
     '''展示房间信息'''
-    await app.send(game.room_info)
+    game: Game = box.cache["game"]
+    await box.send(game.room_info)
 
 
-@app.on_state("play")
-@app.on_cmd("info", "信息")
-async def play_info(game: Game):
+@box.on_cmd(cmds=["info", "信息", "游戏信息"], states=["play"])
+async def play_info():
     '''展示当前牌、所有人筹码、报价'''
-    await app.send(game.card_info + "\n" + game.player_info)
+    game: Game = box.cache["game"]
+    await box.send(game.card_info + "\n" + game.player_info)
 
 
-@app.on_state("play")
-@app.on_text()
-async def quote(data: NumInput, game: Game):
+@box.on_text(states=["play"])
+async def quote(nums=Numbers("请输入一个数字")):
     '''报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
-    num = data.number
-    f, info = game.quote(app.user_id, num)
+    game: Game = box.cache["game"]
+    num = int(nums[0])
+    f, info = game.quote(box.user_id, num)
 
     # 报价失败
     if not f:
-        await app.send(info)
+        await box.send(info)
         return
 
-    await play_info(game)
+    await play_info()
 
     # 本轮是否结束
     if not game.round_is_end:
@@ -298,22 +281,22 @@ async def quote(data: NumInput, game: Game):
 
     # 结算时公布报价结果
     info = game.settle()
-    await app.send(info)
+    await box.send(info)
 
     p = game.winner
     if not p:
         await sleep(2)
         game.round_begin()
-        await app.send("下一轮\n所有人筹码+1")
-        await play_info(game)
+        await box.send("下一轮\n所有人筹码+1")
+        await play_info()
         return
 
-    await app.send(game.player_info)
-    await app.send(f"[{p.name}] 获胜")
+    await box.send(game.player_info)
+    await box.send(f"[{p.name}] 获胜")
     await sleep(2)
     p.win_cnt += 1
 
     # 返回房间
-    await app.goto("room")
-    await app.send(game.room_info)
-    await app.send("发送start开始下一局")
+    await box.set_state("room")
+    await box.send(game.room_info)
+    await box.send("发送start开始下一局")

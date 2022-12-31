@@ -2,29 +2,25 @@
     谁是卧底？
 '''
 from random import choice, randint
-from typing import List, Tuple
-from pydantic import Field
-from ayaka import AyakaApp, AyakaCache, AyakaLargeConfig
-from ayaka.extension import UserInput, singleton, run_in_startup
-from .data.utils import get_path
+from typing import Tuple
+from ayaka import AyakaBox, AyakaConfig, singleton, run_in_startup, get_user, Field
+from .data import load_data
 
 
-def get_data():
-    path = get_path("suspect.txt")
-    with path.open("r", encoding="utf8") as f:
-        lines = [line.strip() for line in f]
-    return [line.split(" ") for line in lines if line]
+def get_words():
+    items = load_data("suspect.txt")
+    return [item.split(" ") for item in items]
 
 
 @run_in_startup
 @singleton
-class Config(AyakaLargeConfig):
-    __app_name__ = "谁是卧底"
-    data: List[Tuple[str, str]] = Field(default_factory=get_data)
+class Config(AyakaConfig):
+    __config_name__ = "谁是卧底"
+    words: list[Tuple[str, str]] = Field(default_factory=get_words)
 
 
-app = AyakaApp("谁是卧底")
-app.help = '''
+box = AyakaBox("谁是卧底")
+help = '''
 至少4人游玩，游玩前请加bot好友，否则无法通过私聊告知关键词
 参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
 卧底只有一个
@@ -76,8 +72,9 @@ class Player:
         return f"[{self.name}] 未投"
 
 
-class Game(AyakaCache):
-    players: List[Player] = []
+class Game:
+    def __init__(self) -> None:
+        self.players: list[Player] = []
 
     @property
     def player_cnt(self):
@@ -138,7 +135,7 @@ class Game(AyakaCache):
         return True, f"{p} 离开房间"
 
     def get_words(self):
-        words_list = Config().data
+        words_list = Config().words
         normal, fake = choice(words_list)
 
         # # 有可能翻转
@@ -243,103 +240,105 @@ class Game(AyakaCache):
 
 
 async def check_friend(uid: int):
-    users = await app.bot.get_friend_list()
+    users = await box.bot.get_friend_list()
     for user in users:
         if user["user_id"] == uid:
             return True
 
 
-@app.on_start_cmds("谁是卧底")
-async def app_entrance(game: Game):
+@box.on_cmd(cmds=["谁是卧底"])
+async def box_entrance():
     '''打开应用'''
-    await app.start()
-    await app.send(app.help)
-    await app.goto("room")
-    await app.send(app.help)
+    await box.start("room")
+    game: Game = box.get_arbitrary_data("game", Game)
+    await box.send(help)
     game.players = []
-    await join(game)
+    await join()
 
 
-@app.on_state("room")
-@app.on_cmd("exit", "退出")
+@box.on_cmd(cmds=["exit", "退出"], states=["room"])
 async def exit_room():
     '''关闭游戏'''
-    await app.close()
+    await box.close()
 
 
-@app.on_state("play")
-@app.on_cmd("exit", "退出")
+@box.on_cmd(cmds=["exit", "退出"], states=["play"])
 async def exit_play():
-    await app.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
+    await box.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
+
+box.set_close_cmds("强制退出", "force_exit")
 
 
-@app.on_state("room")
-@app.on_cmd("join", "加入")
-async def join(game: Game):
+@box.on_cmd(cmds=["join", "加入"], states=["room"])
+async def join():
     '''加入房间'''
+    game: Game = box.get_arbitrary_data("game")
     # 校验好友
-    if not await check_friend(app.user_id):
-        await app.send("只有bot的好友才可以加入房间，因为游戏需要私聊关键词")
+    if not await check_friend(box.user_id):
+        await box.send("只有bot的好友才可以加入房间，因为游戏需要私聊关键词")
         return
 
-    f, info = game.join(app.user_id, app.user_name)
-    await app.send(info)
+    f, info = game.join(box.user_id, box.user_name)
+    await box.send(info)
 
 
-@app.on_state("room")
-@app.on_cmd("leave", "离开")
-async def leave(game: Game):
+@box.on_cmd(cmds=["leave", "离开"], states=["room"])
+async def leave():
     '''离开房间'''
-    f, info = game.leave(app.user_id)
-    await app.send(info)
+    game: Game = box.get_arbitrary_data("game")
+    f, info = game.leave(box.user_id)
+    await box.send(info)
 
     if f and game.player_cnt == 0:
-        await app.close()
+        await box.close()
 
 
-@app.on_state("room")
-@app.on_cmd("start", "begin", "开始")
-async def start(game: Game):
+@box.on_cmd(cmds=["start", "begin", "开始"], states=["room"])
+async def start():
     '''开始游戏'''
+    game: Game = box.get_arbitrary_data("game")
     f, info = game.start()
-    await app.send(info)
+    await box.send(info)
 
     # 启动失败
     if not f:
         return
 
-    await app.goto("play")
+    await box.set_state("play")
     for p in game.players:
-        await app.bot.send_private_msg(user_id=p.uid, message=p.word)
+        await box.bot.send_private_msg(user_id=p.uid, message=p.word)
 
 
-@app.on_state("room")
-@app.on_cmd("info", "信息")
-async def room_info(game: Game):
+@box.on_cmd(cmds=["info", "信息"], states=["room"])
+async def room_info():
     '''展示房间内成员列表'''
-    await app.send(game.room_info)
+    game: Game = box.get_arbitrary_data("game")
+    await box.send(game.room_info)
 
 
-@app.on_state("play")
-@app.on_cmd("info", "信息")
-async def play_info(game: Game):
+@box.on_cmd(cmds=["info", "信息"], states=["play"])
+async def play_info():
     '''展示投票情况'''
-    await app.send(game.players_state)
-    await app.send(game.vote_info)
+    game: Game = box.get_arbitrary_data("game")
+    await box.send(game.players_state)
+    await box.send(game.vote_info)
 
 
-@app.on_state("play")
-@app.on_cmd("vote", "投票")
-async def vote(data: UserInput, game: Game):
+@box.on_cmd(cmds=["vote", "投票"], states=["play"])
+async def vote():
     '''请at你要投票的对象，一旦投票无法更改'''
-    if not data.user:
+    game: Game = box.get_arbitrary_data("game")
+    if not box.arg:
         return
-
-    uid = data.user.id
+    users = await box.bot.get_group_member_list(group_id=box.group_id)
+    user = get_user(box.arg[0], users)
+    if not user:
+        return
+    uid = user.id
 
     # 投票
-    f, info = game.vote(app.user_id, uid)
-    await app.send(info)
+    f, info = game.vote(box.user_id, uid)
+    await box.send(info)
 
     # 投票失败
     if not f:
@@ -351,7 +350,7 @@ async def vote(data: UserInput, game: Game):
 
     # 结算时公布投票结果
     f, info = game.kickout()
-    await app.send(info)
+    await box.send(info)
 
     # 出现平局
     if not f:
@@ -360,13 +359,13 @@ async def vote(data: UserInput, game: Game):
     # 成功踢出一人，判断游戏是否结束
     f, info = game.check_end()
     if not f:
-        await app.send("游戏继续！")
+        await box.send("游戏继续！")
         return
 
     # 展示结果
-    await app.send(game.conclude())
-    await app.send(info)
+    await box.send(game.conclude())
+    await box.send(info)
 
     # 返回房间
-    await app.goto("room")
-    await app.send("已回到房间，可发送start开始下一局")
+    await box.set_state("room")
+    await box.send("已回到房间，可发送start开始下一局")
