@@ -1,4 +1,4 @@
-from ayaka import AyakaBox, get_user, AyakaUserDB
+from ayaka import AyakaBox, get_user, AyakaUserDB, on_command
 
 box = AyakaBox("背包")
 
@@ -15,7 +15,10 @@ def get_money(group_id: int, user_id: int):
     )
 
 
-@box.on_cmd(cmds=["bag", "背包"])
+matcher = on_command("bag", aliases={"背包"})
+
+
+@matcher.handle()
 async def show_bag():
     if not box.arg:
         money = get_money(box.group_id, box.user_id)

@@ -6,10 +6,12 @@ from random import randint
 from ayaka import AyakaBox, Numbers
 
 box = AyakaBox("抢30")
-help = '''至少2人游玩，每人开局10个筹码，每轮自增1个
+box.help = '''
+至少2人游玩，每人开局10个筹码，每轮自增1个
 每轮从52张牌中抽取一张（不放回），所有人按轮次使用筹码参与竞价，出价最高的人获得此牌对应的点数
 重复多轮，谁的点数先达到30点，谁获胜
-52张牌直到用尽后才会洗牌，且只要不退出游戏，下局的牌库将继承上局'''
+52张牌直到用尽后才会洗牌，且只要不退出游戏，下局的牌库将继承上局
+'''
 
 
 class Player:
@@ -195,23 +197,18 @@ class Game:
 async def box_entrance():
     '''打开游戏'''
     await box.start("room")
-    await box.send(help)
+    await box.send_help()
 
-    game = box.cache.get("game", Game())
+    game = box.get_arbitrary_data("game", Game)
     game.reset()
-    box.cache["game"] = game
     f, info = game.join(box.user_id, box.user_name)
     await box.send(info)
 
-box.set_close_cmds("关闭", "close")
+box.set_close_cmds(cmds=["关闭", "close"])
+box.on_cmd(cmds=["help", "帮助"], states="*")(box.send_help)
 
 
-@box.on_cmd(cmds=["help", "帮助"], states=["*"])
-async def send_help():
-    await box.send(help)
-
-
-@box.on_cmd(cmds=["join", "加入"], states=["room"])
+@box.on_cmd(cmds=["join", "加入"], states="room")
 async def join():
     '''加入房间'''
     game: Game = box.cache["game"]
@@ -219,7 +216,7 @@ async def join():
     await box.send(info)
 
 
-@box.on_cmd(cmds=["leave", "离开"], states=["room"])
+@box.on_cmd(cmds=["leave", "离开"], states="room")
 async def leave():
     '''离开房间'''
     game: Game = box.cache["game"]
@@ -227,11 +224,10 @@ async def leave():
     await box.send(info)
 
     if f and game.player_cnt == 0:
-        await box.reset_state()
-        await box.send("抢30已关闭")
+        await box.close()
 
 
-@box.on_cmd(cmds=["start", "begin", "开始"], states=["room"])
+@box.on_cmd(cmds=["start", "begin", "开始"], states="room")
 async def start():
     '''开始游戏'''
     game: Game = box.cache["game"]
@@ -247,21 +243,21 @@ async def start():
     await play_info()
 
 
-@box.on_cmd(cmds=["info", "信息", "房间", "room", "房间信息"], states=["room"])
+@box.on_cmd(cmds=["info", "信息", "房间", "room", "房间信息"], states="room")
 async def room_info():
     '''展示房间信息'''
     game: Game = box.cache["game"]
     await box.send(game.room_info)
 
 
-@box.on_cmd(cmds=["info", "信息", "游戏信息"], states=["play"])
+@box.on_cmd(cmds=["info", "信息", "游戏信息"], states="play")
 async def play_info():
     '''展示当前牌、所有人筹码、报价'''
     game: Game = box.cache["game"]
     await box.send(game.card_info + "\n" + game.player_info)
 
 
-@box.on_text(states=["play"])
+@box.on_text(states="play")
 async def quote(nums=Numbers("请输入一个数字")):
     '''报价叫牌，要么为0，要么比上一个人高，如果全员报价为0，则本轮庄家获得该牌'''
     game: Game = box.cache["game"]

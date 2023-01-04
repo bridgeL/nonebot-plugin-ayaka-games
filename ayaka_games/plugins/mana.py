@@ -6,11 +6,11 @@ from .bag import get_money
 god_names = ['欢愉', '悼亡', '深渊', '智慧']
 
 box = AyakaBox('mana')
-help = '''
+box.help = '''
 ===== m a n a =====
 欢愉、悼亡、深渊、智慧
 ===== ======= =====
-'''.strip()
+'''
 
 
 class ManaGod(AyakaGroupDB):
@@ -159,8 +159,8 @@ def wise(god: ManaGod, mana: int):
     return reward, "宇宙的奥秘在命途中盘旋"
 
 
-box.set_start_cmds("mana", "玛娜")
-box.set_close_cmds("exit", "退出")
+box.set_start_cmds(cmds=["mana", "玛娜"])
+box.set_close_cmds(cmds=["exit", "退出"])
 
 
 @box.on_cmd(cmds=['divine', '占卜'])

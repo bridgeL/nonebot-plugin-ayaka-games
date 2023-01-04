@@ -147,8 +147,8 @@ async def handle():
             break
 
 
-box.set_start_cmds("接龙")
-box.set_close_cmds("exit", "退出")
+box.set_start_cmds(cmds="接龙")
+box.set_close_cmds(cmds=["exit", "退出"])
 
 
 @box.on_cmd(cmds=["list"], states=["menu"])

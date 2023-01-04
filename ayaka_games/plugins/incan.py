@@ -3,7 +3,7 @@ from random import randint, choice, shuffle
 from ayaka import AyakaBox
 
 box = AyakaBox("incan")
-# box.help = "欢迎使用印加宝藏2.0"
+box.help = "欢迎使用印加宝藏2.0"
 
 ruledoc = '''1. 前进，玩家翻开一张卡牌
 2. 撤退，玩家沿着来时的路径原路返回
@@ -313,7 +313,7 @@ async def game_entrance():
     await box.start("room")
 
     # 初始化模型
-    model: Incan = box.get_arbitrary_data("model", Incan)
+    model = box.get_arbitrary_data("model", Incan)
     model.reset()
 
     # 操作

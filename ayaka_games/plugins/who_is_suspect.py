@@ -2,7 +2,6 @@
     谁是卧底？
 '''
 from random import choice, randint
-from typing import Tuple
 from ayaka import AyakaBox, AyakaConfig, singleton, run_in_startup, get_user, Field
 from .data import load_data
 
@@ -16,11 +15,11 @@ def get_words():
 @singleton
 class Config(AyakaConfig):
     __config_name__ = "谁是卧底"
-    words: list[Tuple[str, str]] = Field(default_factory=get_words)
+    words: list[tuple[str, str]] = Field(default_factory=get_words)
 
 
 box = AyakaBox("谁是卧底")
-help = '''
+box.help = '''
 至少4人游玩，游玩前请加bot好友，否则无法通过私聊告知关键词
 参与玩家的群名片不要重名，否则会产生非预期的错误=_=||
 卧底只有一个
@@ -250,8 +249,8 @@ async def check_friend(uid: int):
 async def box_entrance():
     '''打开应用'''
     await box.start("room")
-    game: Game = box.get_arbitrary_data("game", Game)
-    await box.send(help)
+    game = box.get_arbitrary_data("game", Game)
+    await box.send_help()
     game.players = []
     await join()
 
@@ -266,13 +265,13 @@ async def exit_room():
 async def exit_play():
     await box.send("游戏已开始，你确定要终结游戏吗？请使用命令：强制退出")
 
-box.set_close_cmds("强制退出", "force_exit")
+box.set_close_cmds(cmds=["强制退出", "force_exit"])
 
 
 @box.on_cmd(cmds=["join", "加入"], states=["room"])
 async def join():
     '''加入房间'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     # 校验好友
     if not await check_friend(box.user_id):
         await box.send("只有bot的好友才可以加入房间，因为游戏需要私聊关键词")
@@ -285,7 +284,7 @@ async def join():
 @box.on_cmd(cmds=["leave", "离开"], states=["room"])
 async def leave():
     '''离开房间'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     f, info = game.leave(box.user_id)
     await box.send(info)
 
@@ -296,7 +295,7 @@ async def leave():
 @box.on_cmd(cmds=["start", "begin", "开始"], states=["room"])
 async def start():
     '''开始游戏'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     f, info = game.start()
     await box.send(info)
 
@@ -312,14 +311,14 @@ async def start():
 @box.on_cmd(cmds=["info", "信息"], states=["room"])
 async def room_info():
     '''展示房间内成员列表'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     await box.send(game.room_info)
 
 
 @box.on_cmd(cmds=["info", "信息"], states=["play"])
 async def play_info():
     '''展示投票情况'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     await box.send(game.players_state)
     await box.send(game.vote_info)
 
@@ -327,7 +326,7 @@ async def play_info():
 @box.on_cmd(cmds=["vote", "投票"], states=["play"])
 async def vote():
     '''请at你要投票的对象，一旦投票无法更改'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     if not box.arg:
         return
     users = await box.bot.get_group_member_list(group_id=box.group_id)

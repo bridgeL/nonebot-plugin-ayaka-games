@@ -14,3 +14,4 @@ from .plugins.who_is_suspect import *
 from .plugins.genshin_random_event import *
 from .plugins.dragon import *
 from .plugins.calc_24 import *
+from .plugins.word_tax import *

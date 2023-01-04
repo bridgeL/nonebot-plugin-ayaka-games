@@ -5,7 +5,9 @@ from ayaka import AyakaBox, AyakaConfig, run_in_startup, Field
 from .data import load_data
 
 box = AyakaBox("成语查询")
-# box.help = '''有效提高群文学氛围'''
+box.help = '''
+有效提高群文学氛围
+'''
 
 
 class Config(AyakaConfig):

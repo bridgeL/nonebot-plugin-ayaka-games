@@ -6,7 +6,7 @@ from random import choice
 from ayaka import AyakaBox
 
 box = AyakaBox("加一秒")
-help = '''
+box.help = '''
 每人初始时间值为0
 每有3个不同的人执行一次或若干次加1，boss就会完成蓄力，吸取目前时间值最高的人的时间，如果有多人，则都被吸取
 boss时间值>=17时，游戏结束，boss将带走所有比他时间值高的人，剩余人中时间值最高的获胜，世界重启
@@ -179,11 +179,11 @@ class Game:
 @box.on_cmd(cmds=["加一秒"])
 async def box_start():
     '''启动游戏'''
-    game: Game = box.get_arbitrary_data("game", Game)
+    game = box.get_arbitrary_data("game", Game)
     if not game.boss:
         game.reset()
     await box.start()
-    await box.send(help)
+    await box.send_help()
 
 
 @box.on_cmd(cmds=["exit", "退出"], states=["*"])
@@ -196,7 +196,7 @@ async def box_close():
 @box.on_cmd(cmds=["我的"], states=["menu"])
 async def inquiry():
     '''查看你目前的时间'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     time = game.player_group.get_time(box.user_id)
     await box.send(f"[{box.user_name}]目前的时间：{time}")
 
@@ -204,14 +204,14 @@ async def inquiry():
 @box.on_cmd(cmds=["boss"], states=["menu"])
 async def inquiry_boss():
     '''查看boss的时间和能量'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     await box.send(game.boss.state)
 
 
 @box.on_cmd(cmds=["全部"], states=["menu"])
 async def inquiry_all():
     '''查看所有人参与情况，以及boss的时间和能量'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
     # boss
     info = game.boss.state
 
@@ -233,7 +233,7 @@ async def inquiry_all():
 @box.on_cmd(cmds=["加1", "加一", "+1", "+1s"], states=["menu"])
 async def plus():
     '''让你的时间+1'''
-    game: Game = box.get_arbitrary_data("game")
+    game: Game = box.cache["game"]
 
     # 玩家
     time = game.player_group.change_time(box.user_id, 1)

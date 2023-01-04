@@ -3,7 +3,7 @@
 '''
 from random import choice
 from typing import Literal
-from ayaka import AyakaBox, AyakaConfig,  BaseModel
+from ayaka import AyakaBox, AyakaConfig, BaseModel, slow_load_config
 
 box = AyakaBox("原神随机事件")
 
@@ -77,20 +77,20 @@ helps = '''
 '''.strip().split("\n")
 
 
+@slow_load_config
 class Config(AyakaConfig):
     __config_name__ = box.name
     helps: list[str] = helps
     group: Group = default_group
 
 
-config = Config()
-
-
 def get_value_with_custom_part(name, value):
+    config = Config()
     return config.group.get_value(data={name: value})
 
 
 def get_value():
+    config = Config()
     return config.group.get_value()
 
 

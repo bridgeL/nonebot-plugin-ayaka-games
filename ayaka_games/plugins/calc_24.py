@@ -1,43 +1,46 @@
-'''
-    注意，本插件使用了eval ！！！
-  
-    尽管已有所限制，但不保证代码已排除了所有注入风险！！
-'''
 import re
-import ast
 from random import choice
-from ayaka import AyakaBox, AyakaConfig, singleton, run_in_startup, BaseModel, Field
+from pydantic import root_validator
+from ayaka import AyakaBox, AyakaConfig, BaseModel, Field, logger, slow_load_config
 from .bag import get_money
 from .data import load_data
 
+PLUGIN_VERSION = "v2"
 
-@run_in_startup
-@singleton
+
+@slow_load_config
 class Config(AyakaConfig):
     __config_name__ = "24点"
+    version: str = PLUGIN_VERSION
     reward: int = 1000
-    data_24: dict[str, dict] = Field(
+    data_24: dict[str, list] = Field(
         default_factory=lambda: load_data("calc_24", "24.json"))
-    data_48: dict[str, dict] = Field(
+    data_48: dict[str, list] = Field(
         default_factory=lambda: load_data("calc_24", "48.json"))
+
+    @root_validator(pre=True)
+    def check_version(cls, values: dict):
+        if values.get("version") != PLUGIN_VERSION:
+            logger.opt(colors=True).debug(
+                f"检测到插件更新，已删除旧配置 <r>{cls.__config_name__}</r>")
+            return {}
+        return values
 
 
 class Question(BaseModel):
     nums: list[int] = []
-    solution: dict = {}
+    solution: list[str] = []
 
 
 def register(box: AyakaBox, n: int):
     if n == 24:
         def get_data():
-            return Config().data_24
+            config = Config()
+            return config.data_24
     else:
         def get_data():
-            return Config().data_48
-
-    def get_questions():
-        data = get_data()
-        return list(data.keys())
+            config = Config()
+            return config.data_48
 
     @box.on_cmd(cmds=[f"{n}点"])
     async def _():
@@ -46,17 +49,22 @@ def register(box: AyakaBox, n: int):
         await box.send(box.help)
         await set_q()
 
-    box.set_close_cmds("退出", "exit", "quit")
+    box.set_close_cmds(cmds=["退出", "exit", "quit"])
 
     @box.on_cmd(cmds=["出题", "下一题", "next"], states=["run"])
+    async def to_q():
+        await box.set_state("出题")
+
+    @box.on_immediate(state="出题")
     async def set_q():
         cache = box.get_data(Question)
-        q = choice(get_questions())
+        q = choice(list(get_data().keys()))
         nums = q.split(" ")
         solution = get_data()[q]
         cache.nums = [int(n) for n in nums]
         cache.solution = solution
         await box.send(f"{q}\n\nTIPS：本题至少有{len(solution)}种答案（使用不同的运算符）")
+        await box.set_state("run")
 
     @box.on_cmd(cmds=["题目", "查看题目", "查看当前题目", "当前题目", "question"], states=["run"])
     async def _():
@@ -76,7 +84,7 @@ def register(box: AyakaBox, n: int):
             await box.send("请先出题")
             return
 
-        info = "\n".join(solution.values())
+        info = "\n".join(solution)
         await box.send(info)
         await set_q()
 
@@ -88,176 +96,246 @@ def register(box: AyakaBox, n: int):
         if not nums:
             return
 
-        try:
-            exp = box.event.get_plaintext()
-            exp, r = deal(exp, nums)
-        except Exception as e:
-            code, info = e.args
-            await box.send(info)
-            return
+        exp = box.event.get_plaintext()
 
-        if abs(r-n) < 0.1:
-            await box.send(exp + "\n正确！")
+        # 运算
+        r = calc(exp, nums)
+        await box.send(f"{exp}={r}")
+
+        if abs(r-n) < 0.0001:
+            await box.send("正确！")
             reward = Config().reward
             money = get_money(group_id=box.group_id, user_id=box.user_id)
             money.value += reward
             money.save()
             await box.send(f"奖励{reward}金")
+            await box.set_state("出题")
         else:
-            await box.send(exp + "\错误")
+            await box.send("错误")
 
 
-def pre_check(exp: str, nums: list):
-    '''初步检查表达式是否合法，且只许使用限定的操作符和数字'''
-    # 移除空格，纠正操作符
+def check_len(exp: str):
+    '''拒绝长度异常的表达式'''
+    return len(exp) <= 20
+
+
+def pre_correct(exp: str):
+    '''初步矫正表达式：移除空格，纠正操作符'''
     exp = exp.strip().replace("\\", "/").replace(" ", "")
+    exp = exp.replace("x", "*").replace("^", "**")
     exp = re.sub(r"[（{【\[]", "(", exp)
     exp = re.sub(r"[）}】\]]", ")", exp)
-
-    # 过长的表达式，明显有问题
-    if len(exp) > 20:
-        raise Exception(-1, "可疑的输入")
-
-    # 解析格式
-    try:
-        ast.parse(exp)
-    except SyntaxError:
-        raise Exception(-2, "错误的表达式")
-
-    # 复制一份
-    __nums = [n for n in nums]
-
-    # 判断数字是否非法
-    _nums = re.findall(r"\d+", exp)
-    for num in _nums:
-        num = int(num)
-        if num not in nums:
-            raise Exception(-3, "没有使用给定的数字")
-        if num not in __nums:
-            raise Exception(-4, "给定数字必须全部使用，且仅可用一次")
-        __nums.remove(num)
-
-    if __nums:
-        raise Exception(-4, "给定数字必须全部使用，且仅可用一次")
-
-    # 将表达式转为中缀参数数组
-    pt1 = re.compile(r"^\d+")
-    pt2 = re.compile(r"^([\+\-/\(\)\^]|\*{1,2})")
-
-    args = []
-    while exp:
-        r = pt1.search(exp)
-        if r:
-            w = r.group()
-            exp = exp[len(w):]
-            args.append(int(w))
-            continue
-
-        r = pt2.search(exp)
-        if r:
-            w = r.group()
-            exp = exp[len(w):]
-            args.append(w)
-            continue
-
-        raise Exception(-5, "非法操作符")
-
-    # args仍可能有错误
-    return args
+    return exp
 
 
-def mid_to_post(args: list):
-    '''中缀转后缀'''
-    isp = {"#": 0, "(": 1, "**": 7, "*": 5, "/": 5, "+": 3, "-": 3, ")": 8}
-    icp = {"#": 0, "(": 8, "**": 6, "*": 4, "/": 4, "+": 2, "-": 2, ")": 1}
+def check_brackets_close(exp: str):
+    '''检查括号配对是否闭合'''
+    cnt = 0
+    for t in exp:
+        if t == "(":
+            cnt += 1
+        elif t == ")":
+            cnt -= 1
+            if cnt < 0:
+                return False
+    return cnt == 0
 
-    args.append("#")
+
+def check_op(exp: str):
+    '''检测无效操作符'''
+    patt = re.compile(r"\*\*|\*|\+|-|/|\(|\)|\d+")
+    return not patt.sub("", exp)
+
+
+def split_exp(exp: str):
+    '''分割表达式'''
+    patt = re.compile(r"\*\*|\*|\+|-|/|\(|\)|\d+")
+    ts = []
+    for t in patt.findall(exp):
+        if t not in ["(", ")", "+", "-", "*", "/", "**"]:
+            t = int(t)
+        ts.append(t)
+    return ts
+
+
+def check_num(ts: list[str | int], nums: list[int]):
+    '''检查是否使用指定数字'''
+    nums_copy = [n for n in nums]
+    for t in ts:
+        if isinstance(t, int):
+            if t not in nums_copy:
+                return False
+            nums_copy.remove(t)
+    return True
+
+
+def check_and_correct_op(ts: list[str | int]):
+    '''补全缺失的*，检查错误组合'''
+
+    _ts = [ts[0]]
+    last = ts[0]
+
+    for t in ts[1:]:
+        # 数字 + (，补全*
+        if isinstance(last, int) and t == "(":
+            _ts.append("*")
+
+        # (只能 + 数字或(
+        elif last == "(" and isinstance(t, str) and t != "(":
+            return
+
+        # ) + (或数字，补全*
+        elif last == ")" and (isinstance(t, int) or t == "("):
+            _ts.append("*")
+
+        # 其他操作符必定不 + )
+        elif last in ["+", "-", "*", "/", "**"] and t == ")":
+            return
+
+        _ts.append(t)
+        last = t
+    return _ts
+
+
+def mid2post(ts: list[str | int]):
+    '''中缀表达式转后缀表达式'''
+    ts.append("#")
     stack = ["#"]
-    rs = []
-    for arg in args:
-        if isinstance(arg, int):
-            rs.append(arg)
+    rs: list[str | int] = []
+
+    _in = {
+        "#": 0,
+        "(": 1,
+        "+": 2, "-": 2,
+        "*": 4, "/": 4,
+        "**": 6,
+    }
+    _out = {
+        "#": 0,
+        ")": 1,
+        "(": 2,
+        "+": 3, "-": 3,
+        "*": 5, "/": 5,
+        "**": 7,
+    }
+
+    for t in ts:
+        # 数字直接计入结果
+        if isinstance(t, int):
+            rs.append(t)
             continue
 
-        while stack:
-            if isp[stack[-1]] > icp[arg]:
-                rs.append(stack.pop())
-            elif isp[stack[-1]] == icp[arg]:
-                stack.pop()
-            else:
-                break
+        # 操作符判断优先级入栈
+        d = _out[t] - _in[stack[-1]]
 
-        if arg not in [")", "#"]:
-            stack.append(arg)
+        # 若 out < in，则内部操作符优先级更高，出栈，计入结果，且循环判断
+        # 注意：栈不可能通过此条件弹出至空，因为 # 对应 最小in = 最小out = 0
+        while d < 0:
+            rs.append(stack.pop())
+            d = _out[t] - _in[stack[-1]]
+
+        # 若 out > in，则外部操作符优先级更高，入栈
+        if d > 0:
+            stack.append(t)
+
+        # 若 out == in，则优先级相同，出栈，且不计入结果
+        else:
+            stack.pop()
 
     return rs
 
 
-def post_check(args: list):
-    '''检查后缀参数是否正确'''
-    cnt = 0
-    for arg in args:
-        if isinstance(arg, int):
-            cnt += 1
+def base_calc(n1: float, n2: float, op: str):
+    '''计算数值，出错时抛出异常'''
+    logger.debug(f"基本运算单元 {n1}{op}{n2}")
+
+    if op == "*":
+        return n1*n2
+
+    # 除0自动抛出异常
+    if op == "/":
+        return n1 / n2
+
+    if op == "+":
+        return n1 + n2
+
+    if op == "-":
+        return n1 - n2
+
+    if op == "**":
+        # 阻断大指数运算
+        if n1 > 100 or n2 > 100:
+            raise
+        return n1 ** n2
+
+    # 未知操作符
+    raise
+
+
+def calc_post(ts: list[str | int]):
+    '''计算后缀表达式'''
+    ops: list[str] = []
+    nums: list[float] = []
+    for t in ts:
+        if isinstance(t, str):
+            ops.append(t)
         else:
-            cnt -= 1
-        if cnt < 1:
-            raise Exception(-2, "错误的表达式")
+            nums.append(t)
+
+        if len(nums) >= 2 and ops:
+            n2 = nums.pop()
+            n1 = nums.pop()
+            op = ops.pop()
+            n = base_calc(n1, n2, op)
+
+            # 中断过大的运算
+            if n > 10000:
+                raise
+
+            nums.append(n)
+
+    return nums[0]
 
 
-def safe_calc(args: list) -> float:
-    '''安全计算后缀表达式，阻断大指数运算'''
-    stack = []
-    for arg in args:
-        if isinstance(arg, int):
-            stack.append(arg)
-        else:
-            b = stack.pop()
-            a = stack.pop()
+def calc(exp, nums):
+    '''计算表达式'''
+    if not check_len(exp):
+        return "表达式过长"
 
-            if arg == "/" and b == 0:
-                raise Exception(-2, "错误的表达式")
+    exp = pre_correct(exp)
 
-            if arg == "**" and (a > 1000 or b > 10 or b < 0 or a != int(a) or b != int(b)):
-                raise Exception(-6, "恶意表达式")
+    if not check_brackets_close(exp):
+        return "括号未闭合"
 
-            c = eval(f"{a}{arg}{b}")
-            if c > 10000 or c < -10000:
-                raise Exception(-6, "恶意表达式")
+    if not check_op(exp):
+        return "无效操作符"
 
-            stack.append(c)
+    ts = split_exp(exp)
 
-    return stack.pop()
+    if not check_num(ts, nums):
+        return "没有使用指定数字"
 
+    ts = check_and_correct_op(ts)
 
-def post_to_mid(args: list) -> str:
-    '''后缀转中缀'''
-    stack = []
-    for arg in args:
-        if isinstance(arg, int):
-            stack.append(arg)
-        else:
-            b = stack.pop()
-            a = stack.pop()
-            c = f"({a}{arg}{b})"
-            stack.append(c)
+    if not ts:
+        return "错误的表达式"
 
-    return stack.pop()[1:-1]
+    ts = mid2post(ts)
 
+    logger.debug(f"后缀表达式 {ts}")
 
-def deal(exp, nums):
-    args = pre_check(exp, nums)
-    args = mid_to_post(args)
-    post_check(args)
-    r = safe_calc(args)
-    exp = post_to_mid(args) + f" = {r}"
-    return exp, r
+    try:
+        v = calc_post(ts)
+    except:
+        return "计算出错"
+
+    return v
 
 
 box_1 = AyakaBox("24点")
-box_1.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出24点"
+box_1.help = "加减乘除次方，5种运算符可用；给出4个1-9范围内的数字，请通过以上运算符算出24点"
 register(box_1, 24)
 
 box_2 = AyakaBox("48点")
-box_2.help = "加减乘除次方，5种运算符可用；给出4个1-13范围内的数字，请通过以上运算符算出48点"
+box_2.help = "加减乘除次方，5种运算符可用；给出4个1-9范围内的数字，请通过以上运算符算出48点"
 register(box_2, 48)
