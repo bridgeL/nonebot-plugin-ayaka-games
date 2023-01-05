@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nonebot_plugin_ayaka_games"
-version = "0.5.1b1"
+version = "0.5.1b2"
 description = "ayaka小游戏合集"
 authors = ["Su <wxlxy316@163.com>"]
 license = "MIT"
