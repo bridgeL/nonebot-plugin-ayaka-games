@@ -1,7 +1,7 @@
 from random import sample
 from time import time
-from ayaka import AyakaBox, AyakaUserDB, AyakaDB, AyakaConfig, BaseModel, Bot, GroupMessageEvent, Field, slow_load_config
-from .bag import get_money
+from ayaka import AyakaBox, AyakaUserDB, AyakaGroupDB, AyakaDB, AyakaConfig, BaseModel, Bot, GroupMessageEvent, Field, slow_load_config
+from .bag import get_money, Money
 
 box = AyakaBox("文字税")
 
@@ -9,54 +9,114 @@ box = AyakaBox("文字税")
 @slow_load_config
 class Config(AyakaConfig):
     __config_name__ = box.name
-    words: str = ""
+    words: list[str] = [
+        s for s in "然说用一是个大的过天有点好也没要请查看后出多现在啊为前不到数你怎么能发还这都吧时开小了来人那什写器成就问上本可以得吗我下去码件里自会绑定群直接行他新给图"]
     tax: int = 100
+    buy_price: int = 1000
+    open_duration: int = 300
+    valid_duration: int = 86400
+    tax_notice: bool = True
 
 
 class UserWord(AyakaUserDB):
-    __table_name__ = "user_word"
-    words: str = ""
-    time: int = 0
-
-
-class Word(AyakaDB):
-    __table_name__ = "group_word"
-    group_id: int = Field(extra=AyakaDB.__primary_key__)
+    __table_name__ = "word_tax"
     word: str = Field(extra=AyakaDB.__primary_key__)
-    cnt: int = 0
+    uname: str = ""
     time: int = 0
-    owners: list = Field([], extra=AyakaDB.__json_key__)
 
 
-class Market(BaseModel):
-    open_time: int = 0
+class GroupWord(AyakaGroupDB):
+    __table_name__ = "word_tax_group"
     words: str = ""
+
+
+class GroupMarket(BaseModel):
+    time: int = 0
+    words: list[str] = []
+    users: list[UserWord] = []
+    first: bool = True
+
+    def __init__(self, **data) -> None:
+        super().__init__(**data)
+        self.load(box.group_id)
+
+    def load(self, group_id):
+        if self.first:
+            self.first = False
+            self.users = UserWord.select_many(group_id=group_id)
+            if self.users:
+                self.time = self.users[0].time
+                words = GroupWord.select_one(group_id=group_id).words
+                self.words = [u for u in words]
 
     def refresh(self, group_id):
         config = Config()
-        self.open_time = int(time())
-        self.words = "".join(sample(config.words, 20))
-        _words = [
-            Word.select_one(group_id=group_id, word=w)
-            for w in self.words
-        ]
-        for w in _words:
-            w.cnt = 0
-            w.time = self.open_time
-            w.owners = []
+        self.first = False
+        self.time = int(time())
+        self.words = sample(config.words, 20)
+        GroupWord.select_one(group_id=group_id).words = "".join(self.words)
+        self.users = []
+        UserWord.delete(
+            group_id=group_id
+        )
 
     def is_open(self):
-        return int(time()) - self.open_time <= 600
+        config = Config()
+        return int(time()) - self.time <= config.open_duration
 
-    def buy(self, group_id):
-        words = "".join(sample(self.words), 3)
-        _words = [
-            Word.select_one(group_id=group_id, word=w)
-            for w in words
+    def is_valid(self):
+        config = Config()
+        return int(time()) - self.time <= config.valid_duration
+
+    def buy(self, group_id, user_id, uname):
+        UserWord.delete(
+            group_id=group_id,
+            user_id=user_id,
+        )
+        self.users = [
+            u for u in self.users
+            if u.group_id != group_id or u.user_id != user_id
         ]
-        for w in _words:
-            w.owners.append()
+        words = sample(self.words, 3)
+        users = [
+            UserWord(
+                group_id=group_id,
+                user_id=user_id,
+                word=word,
+                time=self.time,
+                uname=uname
+            )
+            for word in words
+        ]
+        UserWord.insert_many(users)
+        self.users.extend(users)
         return words
+
+    def check(self, msg: str, user_id: int):
+        check_dict: dict[str, list[UserWord]] = {}
+        for u in self.users:
+            if u.user_id == user_id:
+                break
+        else:
+            # 排除没抽的人
+            return {}
+
+        for u in self.users:
+            if u.user_id == user_id:
+                continue
+            if u.word not in check_dict:
+                check_dict[u.word] = [u]
+            else:
+                check_dict[u.word].append(u)
+
+        _check_dict: dict[str, list[UserWord]] = {}
+        for m in msg:
+            if m not in _check_dict and m in check_dict:
+                _check_dict[m] = check_dict[m]
+        return _check_dict
+
+    def get_words(self, user_id: int):
+        return [u.word for u in self.users if u.user_id == user_id]
 
 
 async def Admin(bot: Bot, event: GroupMessageEvent):
@@ -66,49 +126,73 @@ async def Admin(bot: Bot, event: GroupMessageEvent):
 
 @box.on_cmd(cmds=["开放文字市场", "刷新文字市场"])
 async def open_word_market(bot: Bot, event: GroupMessageEvent):
-    '''刷新文字市场，开放福袋购买十分钟'''
-    if not Admin(bot, event):
+    '''刷新文字市场，开放福袋购买'''
+    if not await Admin(bot, event):
         await box.send("请联系管理员开放市场，您没有权限")
         return
 
-    market = box.get_data(Market)
-    market.refresh()
-    await box.send(f"市场已开放，持续十分钟，本轮文字池为 {market.words}")
+    config = Config()
+    market = box.get_data(GroupMarket)
+    market.refresh(box.group_id)
+    await box.send(f"市场已开放，持续{config.open_duration}s，本轮文字池为 {market.words}")
 
 
-@box.on_cmd(cmds=["购买文字"])
+@box.on_cmd(cmds="购买文字")
 async def buy_words():
-    '''花费1000金购买一次福袋，随机获得3个文字'''
-    market = box.get_data(Market)
+    '''花费金钱购买一次福袋，获得3个随机文字'''
+    config = Config()
+    market = box.get_data(GroupMarket)
     if not market.is_open():
         await box.send("市场未开放，请联系管理员开放市场后再购买")
     else:
         money = get_money(box.group_id, box.user_id)
-        money.value -= 1000
-        user_word = Word.select_one(
-            group_id=box.group_id,
-            user_id=box.user_id,
-        )
-        words = market.buy()
-        user_word.words = words
-        user_word.time = int(time())
-        await box.send(f"[{box.user_name}] 花费1000金，购买了文字 {words}")
+        money.value -= config.buy_price
+        words = market.buy(box.group_id, box.user_id, box.user_name)
+        await box.send(f"[{box.user_name}] 花费{config.buy_price}金，购买了文字 {words}")
 
 
-# @box.on_text()
-# async def get_tax():
-#     '''计算税收'''
-#     market = box.get_data(Market)
-#     if not market.is_open():
-#         await box.send("市场未开放，请联系管理员开放市场后再购买")
-#     else:
-#         money = get_money(box.group_id, box.user_id)
-#         money.value -= 1000
-#         user_word = UserWord.select_one(
-#             group_id=box.group_id,
-#             user_id=box.user_id,
-#         )
-#         words = market.buy()
-#         user_word.words = words
-#         user_word.time  = int(time())
-#         await box.send(f"[{box.user_name}] 花费1000金，购买了文字 {words}")
+@box.on_cmd(cmds="我的文字")
+async def buy_words():
+    '''查看自己的文字'''
+    market = box.get_data(GroupMarket)
+    await box.send(f"[{box.user_name}]当前拥有 {market.get_words(box.user_id)}")
+
+
+@box.on_text()
+async def get_tax():
+    '''计算税收'''
+    market = box.get_data(GroupMarket)
+    if market.is_open():
+        return
+
+    if not market.is_valid():
+        return
+
+    config = Config()
+    msg = box.arg.extract_plain_text()
+    check_dict = market.check(msg, box.user_id)
+    if not check_dict:
+        return
+
+    user_moneys: dict[int, Money] = {}
+    for users in check_dict.values():
+        for u in users:
+            if u.user_id not in user_moneys:
+                user_moneys[u.user_id] = get_money(u.group_id, u.user_id)
+    user_moneys[box.user_id] = get_money(box.group_id, box.user_id)
+
+    for w in check_dict.keys():
+        msg = msg.replace(w, f"[{w}]")
+    infos = [msg]
+
+    for w, users in check_dict.items():
+        t = int(config.tax / len(users))
+        tt = t*len(users)
+        user_moneys[box.user_id].value -= tt
+        for u in users:
+            user_moneys[u.user_id].value += t
+        names = [u.uname for u in users]
+        infos.append(f"[{w}] 所有者：{names}，您为此字付费{tt}金")
+
+    if config.tax_notice:
+        await box.send_many(infos)
