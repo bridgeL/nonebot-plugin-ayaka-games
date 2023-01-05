@@ -100,18 +100,22 @@ def register(box: AyakaBox, n: int):
 
         # 运算
         r = calc(exp, nums)
+        if isinstance(r, str):
+            await box.send(r)
+            return
+
         await box.send(f"{exp}={r}")
 
-        if abs(r-n) < 0.0001:
-            await box.send("正确！")
-            reward = Config().reward
-            money = get_money(group_id=box.group_id, user_id=box.user_id)
-            money.value += reward
-            money.save()
-            await box.send(f"奖励{reward}金")
-            await box.set_state("出题")
-        else:
+        if abs(r-n) > 0.0001:
             await box.send("错误")
+            return
+
+        await box.send("正确！")
+        reward = Config().reward
+        money = get_money(group_id=box.group_id, user_id=box.user_id)
+        money.value += reward
+        await box.send(f"奖励{reward}金")
+        await box.set_state("出题")
 
 
 def check_len(exp: str):
@@ -150,7 +154,7 @@ def check_op(exp: str):
 def split_exp(exp: str):
     '''分割表达式'''
     patt = re.compile(r"\*\*|\*|\+|-|/|\(|\)|\d+")
-    ts = []
+    ts: list[int | str] = []
     for t in patt.findall(exp):
         if t not in ["(", ")", "+", "-", "*", "/", "**"]:
             t = int(t)
@@ -213,10 +217,10 @@ def mid2post(ts: list[str | int]):
     _out = {
         "#": 0,
         ")": 1,
-        "(": 2,
         "+": 3, "-": 3,
         "*": 5, "/": 5,
         "**": 7,
+        "(": 8,
     }
 
     for t in ts:
@@ -280,7 +284,7 @@ def calc_post(ts: list[str | int]):
         if isinstance(t, str):
             ops.append(t)
         else:
-            nums.append(t)
+            nums.append(float(t))
 
         if len(nums) >= 2 and ops:
             n2 = nums.pop()

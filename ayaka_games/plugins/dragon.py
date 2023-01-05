@@ -128,19 +128,16 @@ async def handle():
                     usermoney = get_money(
                         group_id=box.group_id, user_id=box.user_id)
                     usermoney.value += config.reward
-                    usermoney.save()
                     await box.send(f"[{name}] 接龙成功！奖励{config.reward}金")
 
                     # 修改记录
                     user_data = DragonUserData.get(dragon.name)
                     user_data.cnt += 1
-                    user_data.save()
 
             # 无论是否成功接龙都发送下一个词
             word = dragon.next(word)
             if word:
                 dragon_data.last = word
-                dragon_data.save()
             else:
                 word = choice(["%$#*-_", "你赢了", "接不上来..."])
             await box.send(word)
