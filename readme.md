@@ -12,5 +12,4 @@
 
 ## 文档
 
-https://bridgel.github.io/ayaka_doc/1.0.1/games/game/
-
+https://bridgel.github.io/ayaka_doc/latest/games/game/
