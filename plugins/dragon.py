@@ -98,7 +98,7 @@ class Config(AyakaConfig):
 zh = re.compile(r"[\u4e00-\u9fff]+")
 
 
-@box.on_text(states=["*", "idle"])
+@box.on_text(always=True)
 async def handle():
     text = box.event.get_plaintext()
     r = zh.search(text)
@@ -148,7 +148,7 @@ box.set_start_cmds(cmds="接龙")
 box.set_close_cmds(cmds=["exit", "退出"])
 
 
-@box.on_cmd(cmds=["list"], states=["menu"])
+@box.on_cmd(cmds=["list"], states="idle")
 async def list_all():
     '''列出所有词库'''
     config = Config()
@@ -162,7 +162,7 @@ async def list_all():
     await box.send("\n".join(items))
 
 
-@box.on_cmd(cmds=["use"], states=["menu"])
+@box.on_cmd(cmds=["use"], states="idle")
 async def use_dragon():
     '''使用指定词库'''
     config = Config()
@@ -179,7 +179,7 @@ async def use_dragon():
     await box.send(f"已使用[{name}]")
 
 
-@box.on_cmd(cmds=["unuse"], states=["menu"])
+@box.on_cmd(cmds=["unuse"], states="idle")
 async def unuse_dragon():
     '''关闭指定词库'''
     config = Config()
@@ -197,7 +197,7 @@ async def unuse_dragon():
     await box.send(f"已停用[{name}]")
 
 
-@box.on_cmd(cmds=["data"], states=["menu"])
+@box.on_cmd(cmds=["data"], states="idle")
 async def show_data():
     '''展示你的答题数据'''
     gid = box.group_id
@@ -216,7 +216,7 @@ async def show_data():
     await box.send(info)
 
 
-@box.on_cmd(cmds=["rank"], states=["menu"])
+@box.on_cmd(cmds=["rank"], states="idle")
 async def show_rank():
     '''展示排行榜'''
     config = Config()
@@ -252,7 +252,7 @@ async def show_rank():
     await box.send(info.strip())
 
 
-@box.on_cmd(cmds=["auto"], states=["menu"])
+@box.on_cmd(cmds=["auto"], states="idle")
 async def auto_dragon():
     '''使用指定词库和起始点自动接龙n个'''
     config = Config()

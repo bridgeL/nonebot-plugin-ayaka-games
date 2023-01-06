@@ -247,7 +247,7 @@ async def check_friend(uid: int):
 
 @box.on_cmd(cmds=["谁是卧底"])
 async def box_entrance():
-    '''打开应用'''
+    '''打开盒子'''
     await box.start("room")
     game = box.get_arbitrary_data("game", Game)
     await box.send_help()

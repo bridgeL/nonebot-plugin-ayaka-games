@@ -309,7 +309,7 @@ async def Gaming(model: Incan):
 
 @box.on_cmd(cmds=["incan", "印加"])
 async def game_entrance():
-    '''打开应用'''
+    '''打开盒子'''
     await box.start("room")
 
     # 初始化模型

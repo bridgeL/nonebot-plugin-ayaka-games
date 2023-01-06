@@ -193,7 +193,7 @@ async def box_close():
     await box.close()
 
 
-@box.on_cmd(cmds=["我的"], states=["menu"])
+@box.on_cmd(cmds=["我的"], states="idle")
 async def inquiry():
     '''查看你目前的时间'''
     game: Game = box.cache["game"]
@@ -201,14 +201,14 @@ async def inquiry():
     await box.send(f"[{box.user_name}]目前的时间：{time}")
 
 
-@box.on_cmd(cmds=["boss"], states=["menu"])
+@box.on_cmd(cmds=["boss"], states="idle")
 async def inquiry_boss():
     '''查看boss的时间和能量'''
     game: Game = box.cache["game"]
     await box.send(game.boss.state)
 
 
-@box.on_cmd(cmds=["全部"], states=["menu"])
+@box.on_cmd(cmds=["全部"], states="idle")
 async def inquiry_all():
     '''查看所有人参与情况，以及boss的时间和能量'''
     game: Game = box.cache["game"]
@@ -230,7 +230,7 @@ async def inquiry_all():
     await box.send(info)
 
 
-@box.on_cmd(cmds=["加1", "加一", "+1", "+1s"], states=["menu"])
+@box.on_cmd(cmds=["加1", "加一", "+1", "+1s"], states="idle")
 async def plus():
     '''让你的时间+1'''
     game: Game = box.cache["game"]
