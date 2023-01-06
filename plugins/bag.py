@@ -22,6 +22,7 @@ matcher = on_command("bag", aliases={"背包"})
 async def show_bag():
     if not box.arg:
         money = get_money(box.group_id, box.user_id)
+        name = box.user_name
     else:
         users = await box.bot.get_group_member_list(group_id=box.group_id)
         user = get_user(box.arg[0], users)
@@ -29,5 +30,6 @@ async def show_bag():
             await box.send("查无此人")
             return
         money = get_money(box.group_id, user.id)
+        name = user.name
 
-    await box.send(f"[{box.user_name}]当前有 {money.value}金")
+    await box.send(f"[{name}]当前有 {money.value}金")

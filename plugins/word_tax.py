@@ -158,6 +158,17 @@ async def buy_words():
     await box.send(f"[{box.user_name}]当前拥有 {market.get_words(box.user_id)}")
 
 
+@box.on_cmd(cmds="所有文字")
+async def buy_words():
+    '''查看所有人的文字'''
+    market = box.get_data(GroupMarket)
+    if market.is_valid():
+        items = [f"[{u.uname}] {u.word}" for u in market.users]
+        await box.send_many(items)
+    else:
+        await box.send("这一轮文字税尚未开始")
+
+
 @box.on_text()
 async def get_tax():
     '''计算税收'''
