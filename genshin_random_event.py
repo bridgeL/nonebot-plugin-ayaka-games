@@ -84,9 +84,9 @@ class Config(AyakaConfig):
     group: Group = default_group
 
 
-def get_value_with_custom_part(name, value):
+def get_value_with_custom_part(data: dict):
     config = Config()
-    return config.group.get_value(data={name: value})
+    return config.group.get_value(data=data)
 
 
 def get_value():
@@ -94,10 +94,11 @@ def get_value():
     return config.group.get_value()
 
 
-@box.on_cmd(cmds=["原神随机事件"])
+@box.on_cmd(cmds="原神随机事件")
 async def _():
+    '''带参数可以自定义事件，例如：原神随机事件 喝水'''
     event = str(box.arg)
     if event:
-        await box.send(get_value_with_custom_part("事件", event))
+        await box.send(get_value_with_custom_part({"事件": event}))
     else:
         await box.send(get_value())

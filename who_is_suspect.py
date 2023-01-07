@@ -2,7 +2,7 @@
     谁是卧底？
 '''
 from random import choice, randint
-from ayaka import AyakaBox, AyakaConfig, singleton, run_in_startup, get_user, Field
+from ayaka import AyakaBox, AyakaConfig, slow_load_config, get_user, Field
 from .data import load_data
 
 
@@ -11,8 +11,7 @@ def get_words():
     return [item.split(" ") for item in items]
 
 
-@run_in_startup
-@singleton
+@slow_load_config
 class Config(AyakaConfig):
     __config_name__ = "谁是卧底"
     words: list[tuple[str, str]] = Field(default_factory=get_words)
