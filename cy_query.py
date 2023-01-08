@@ -56,9 +56,10 @@ async def handle():
     words = []
     for _word in search_dict:
         for arg in args:
-            if arg in _word:
-                words.append(_word)
+            if arg not in _word:
                 break
+        else:
+            words.append(_word)
 
     if not words:
         await box.send("没有找到相关信息")
