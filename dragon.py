@@ -8,7 +8,7 @@ from ayaka import AyakaBox, slow_load_config, Timer, AyakaDB, AyakaConfig, BaseM
 from .bag import get_money
 from .data import load_data
 
-box = AyakaBox("接龙")
+box = AyakaBox("接龙管理")
 box.help = '''接龙，在聊天时静默运行'''
 
 
