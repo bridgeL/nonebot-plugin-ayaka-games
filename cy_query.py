@@ -31,7 +31,7 @@ async def show_word(word: str):
 
 
 @box.on_cmd(cmds="查询成语")
-async def handle():
+async def handle_1():
     '''查询指定成语的意思'''
     word = box.arg.extract_plain_text()
     await show_word(word)
@@ -40,16 +40,20 @@ MATCHER = on_regex(r"(.*?)是(不是)?成语吗?", rule=box.rule())
 
 
 @MATCHER.handle()
-async def handle(args: tuple = RegexGroup()):
+async def handle_2(args: tuple = RegexGroup()):
     word = args[0]
     await show_word(word)
 
 
 @box.on_cmd(cmds="搜索成语")
-async def handle():
+async def handle_3():
     '''搜索所有相关的成语，可输入多个关键词更准确'''
     config = Config()
     args = [arg for arg in box.args if isinstance(arg, str)]
+
+    if not args:
+        await box.send("没有输入关键词")
+        return
 
     search_dict = config.words
 
@@ -63,9 +67,13 @@ async def handle():
 
     if not words:
         await box.send("没有找到相关信息")
+        return
 
     n = len(words)
-    infos = [f"共找到{n}条相关信息"]
+    infos = [
+        f"搜索关键词：{args}",
+        f"共找到{n}条相关信息"
+    ]
     if n > 100:
         infos.append("数量过多，仅展示随机抽取的100条")
         words = sample(words, 100)
