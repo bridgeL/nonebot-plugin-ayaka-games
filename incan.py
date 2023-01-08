@@ -2,7 +2,7 @@ from enum import Enum
 from random import randint, choice, shuffle
 from ayaka import AyakaBox
 
-box = AyakaBox("incan")
+box = AyakaBox("印加宝藏")
 box.help = "欢迎使用印加宝藏2.0"
 
 ruledoc = '''1. 前进，玩家翻开一张卡牌

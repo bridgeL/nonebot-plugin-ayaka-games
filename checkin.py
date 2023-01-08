@@ -21,7 +21,7 @@ class LastDate(AyakaUserDB):
     value: str = ""
 
 
-@box.on_cmd(cmds=['checkin', '签到'])
+@box.on_cmd(cmds=['checkin', '签到'], always=True)
 async def checkin():
     last_date = LastDate.select_one(
         group_id=box.group_id,
