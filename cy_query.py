@@ -1,6 +1,7 @@
 '''
     成语查询
 '''
+from random import sample
 from nonebot import on_regex
 from ayaka import AyakaBox, AyakaConfig, slow_load_config, Field
 from nonebot.params import RegexGroup
@@ -46,30 +47,27 @@ async def handle(args: tuple = RegexGroup()):
 
 @box.on_cmd(cmds="搜索成语")
 async def handle():
-    '''搜索所有相关的成语'''
+    '''搜索所有相关的成语，可输入多个关键词更准确'''
     config = Config()
-    word = box.arg.extract_plain_text()
-
-    # 防止有人搞事
-    word = word[:10]
-    n = len(word)
-    nn = max(int(n*3/4), 1)
+    args = [arg for arg in box.args if isinstance(arg, str)]
 
     search_dict = config.words
 
     words = []
     for _word in search_dict:
-        cnt = len([w for w in word if w in _word])
-        if cnt >= nn:
-            words.append(_word)
+        for arg in args:
+            if arg in _word:
+                words.append(_word)
+                break
 
     if not words:
         await box.send("没有找到相关信息")
 
     n = len(words)
     infos = [f"共找到{n}条相关信息"]
-    for i in range(0, n, 100):
-        ws = words[i*100:(i+1)*100]
-        if ws:
-            infos.append(" ".join(ws))
+    if n > 100:
+        infos.append("数量过多，仅展示随机抽取的100条")
+        words = sample(words, 100)
+    if words:
+        infos.append("\n".join(words))
     await box.send_many(infos)
