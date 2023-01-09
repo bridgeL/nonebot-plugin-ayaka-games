@@ -48,7 +48,7 @@ class Downloader:
             except:
                 logger.warning("目前无法获取资源目录，这意味资源数据无法同步为最新版本，尽管如此，仍可加载本地的资源文件")
             else:
-                data = json.load(data)
+                data = json.loads(data)
                 res_info = ResInfo(**data)
                 await resource_download_by_res_info(res_info, self.BASE_DIR)
 
