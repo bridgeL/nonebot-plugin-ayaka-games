@@ -238,7 +238,7 @@ async def start():
     if not f:
         return
 
-    await box.set_state("play")
+    box.state = "play"
     game.round_begin()
     await play_info()
 
@@ -293,6 +293,6 @@ async def quote(nums=Numbers("请输入一个数字")):
     p.win_cnt += 1
 
     # 返回房间
-    await box.set_state("room")
+    box.state = "room"
     await box.send(game.room_info)
     await box.send("发送start开始下一局")

@@ -1,21 +1,19 @@
 from random import sample
 from time import time
-from ayaka import AyakaBox, AyakaUserDB, AyakaGroupDB, AyakaDB, AyakaConfig, BaseModel, Bot, GroupMessageEvent, Field, slow_load_config
+from ayaka import AyakaBox, AyakaUserDB, AyakaGroupDB, AyakaDB, BaseModel, Bot, GroupMessageEvent, Field, load_data_from_file
 from .bag import get_money, Money
+from .data import downloader, config
 
 box = AyakaBox("文字税")
 
 
-@slow_load_config
-class Config(AyakaConfig):
-    __config_name__ = box.name
-    words: list[str] = [
-        s for s in "然说用一是个大的过天有点好也没要请查看后出多现在啊为前不到数你怎么能发还这都吧时开小了来人那什写器成就问上本可以得吗我下去码件里自会绑定群直接行他新给图"]
-    tax: int = 100
-    buy_price: int = 1000
-    open_duration: int = 300
-    valid_duration: int = 86400
-    tax_notice: bool = True
+words: list[str] = []
+
+
+@downloader.on_finish
+async def finish():
+    path = downloader.BASE_DIR / "文字税.txt"
+    words.extend(load_data_from_file(path))
 
 
 class UserWord(AyakaUserDB):
@@ -50,10 +48,9 @@ class GroupMarket(BaseModel):
                 self.words = [u for u in words]
 
     def refresh(self, group_id):
-        config = Config()
         self.first = False
         self.time = int(time())
-        self.words = sample(config.words, 20)
+        self.words = sample(words, 20)
         GroupWord.select_one(group_id=group_id).words = "".join(self.words)
         self.users = []
         UserWord.delete(
@@ -61,12 +58,10 @@ class GroupMarket(BaseModel):
         )
 
     def is_open(self):
-        config = Config()
-        return int(time()) - self.time <= config.open_duration
+        return int(time()) - self.time <= config.word_tax.open_duration
 
     def is_valid(self):
-        config = Config()
-        return int(time()) - self.time <= config.valid_duration
+        return int(time()) - self.time <= config.word_tax.valid_duration
 
     def buy(self, group_id, user_id, uname):
         UserWord.delete(
@@ -131,24 +126,22 @@ async def open_word_market(bot: Bot, event: GroupMessageEvent):
         await box.send("请联系管理员开放市场，您没有权限")
         return
 
-    config = Config()
     market = box.get_data(GroupMarket)
     market.refresh(box.group_id)
-    await box.send(f"市场已开放，持续{config.open_duration}s，本轮文字池为 {market.words}")
+    await box.send(f"市场已开放，持续{config.word_tax.open_duration}s，本轮文字池为 {market.words}")
 
 
 @box.on_cmd(cmds="购买文字")
 async def buy_words():
     '''花费金钱购买一次福袋，获得3个随机文字'''
-    config = Config()
     market = box.get_data(GroupMarket)
     if not market.is_open():
         await box.send("市场未开放，请联系管理员开放市场后再购买")
     else:
         money = get_money(box.group_id, box.user_id)
-        money.value -= config.buy_price
+        money.value -= config.word_tax.buy_price
         words = market.buy(box.group_id, box.user_id, box.user_name)
-        await box.send(f"[{box.user_name}] 花费{config.buy_price}金，购买了文字 {words}")
+        await box.send(f"[{box.user_name}] 花费{config.word_tax.buy_price}金，购买了文字 {words}")
 
 
 @box.on_cmd(cmds="我的文字")
@@ -179,7 +172,6 @@ async def get_tax():
     if not market.is_valid():
         return
 
-    config = Config()
     msg = box.arg.extract_plain_text()
     check_dict = market.check(msg, box.user_id)
     if not check_dict:
@@ -197,7 +189,7 @@ async def get_tax():
     infos = [msg]
 
     for w, users in check_dict.items():
-        t = int(config.tax / len(users))
+        t = int(config.word_tax.tax / len(users))
         tt = t*len(users)
         user_moneys[box.user_id].value -= tt
         for u in users:
@@ -205,5 +197,5 @@ async def get_tax():
         names = [u.uname for u in users]
         infos.append(f"[{w}] 所有者：{names}，您为此字付费{tt}金")
 
-    if config.tax_notice:
+    if config.word_tax.tax_notice:
         await box.send_many(infos)

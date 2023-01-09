@@ -355,7 +355,7 @@ async def handle():
 async def handle():
     '''开始游戏'''
     model: Incan = box.cache["model"]
-    await box.set_state("gaming")
+    box.state = "gaming"
 
     await box.send('游戏开始，输入[go/back]决定前进/撤退，此指令支持私聊我发出哦~')
     await box.send(f'第1轮：{model.temples.Draw().name}')

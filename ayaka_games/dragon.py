@@ -4,9 +4,9 @@
 import re
 from random import choice
 from pypinyin import lazy_pinyin
-from ayaka import AyakaBox, slow_load_config, Timer, AyakaDB, AyakaConfig, BaseModel, Field
+from ayaka import AyakaBox, AyakaDB, BaseModel, load_data_from_file, Field
 from .bag import get_money
-from .data import load_data
+from .data import downloader, config
 
 box = AyakaBox("接龙管理")
 box.help = '''接龙，在聊天时静默运行'''
@@ -62,21 +62,18 @@ class DragonUserData(AyakaDB):
         )
 
 
-def get_dragon_list():
-    with Timer("创建接龙配置文件"):
-        idiom_words = load_data("dragon", "成语.txt")
-        genshin_words = load_data("dragon", "原神.txt")
-        return [
-            Dragon(name="成语", words=idiom_words),
-            Dragon(name="原神", words=genshin_words)
-        ]
+dragon_list: list[Dragon] = []
 
 
-@slow_load_config
-class Config(AyakaConfig):
-    __config_name__ = box.name
-    reward: int = 1000
-    dragon_list: list[Dragon] = Field(default_factory=get_dragon_list)
+@downloader.on_finish
+async def finish():
+    path = downloader.BASE_DIR / "接龙"
+    for p in path.iterdir():
+        try:
+            words = load_data_from_file(p)
+            dragon_list.append(Dragon(name=p.stem, words=words))
+        except:
+            pass
 
 
 zh = re.compile(r"[\u4e00-\u9fff]+")
@@ -84,15 +81,15 @@ zh = re.compile(r"[\u4e00-\u9fff]+")
 
 @box.on_text(always=True)
 async def handle():
+    '''自动接龙'''
     text = box.event.get_plaintext()
     r = zh.search(text)
     if not r:
         return
 
     word = r.group()
-    config = Config()
 
-    for dragon in config.dragon_list:
+    for dragon in dragon_list:
         # 跳过不启用的接龙
         if not dragon.use:
             continue
@@ -111,8 +108,8 @@ async def handle():
                     # 修改金钱
                     usermoney = get_money(
                         group_id=box.group_id, user_id=box.user_id)
-                    usermoney.value += config.reward
-                    await box.send(f"[{box.user_name}] 接龙成功！奖励{config.reward}金")
+                    usermoney.value += config.dragon_reward
+                    await box.send(f"[{box.user_name}] 接龙成功！奖励{config.dragon_reward}金")
 
                     # 修改记录
                     user_data = DragonUserData.get(dragon.name)
@@ -128,16 +125,15 @@ async def handle():
             break
 
 
-box.set_start_cmds(cmds="接龙")
+box.set_start_cmds(cmds="接龙管理")
 box.set_close_cmds(cmds=["exit", "退出"])
 
 
 @box.on_cmd(cmds="list", states="idle")
 async def list_all():
     '''列出所有词库'''
-    config = Config()
     items = ["所有词库："]
-    for dragon in config.dragon_list:
+    for dragon in dragon_list:
         if dragon.use:
             items.append(f"[{dragon.name}] 正在使用")
         else:
@@ -167,7 +163,6 @@ async def show_data():
 @box.on_cmd(cmds="rank", states="idle")
 async def show_rank():
     '''展示排行榜'''
-    config = Config()
     data: dict[str, list[DragonUserData]] = {}
 
     # SELECT * from dragon_user_data ORDER BY dragon_name, cnt DESC
@@ -178,7 +173,7 @@ async def show_rank():
         data[user_data.dragon_name].append(user_data)
 
     # 无人使用
-    for dragon in config.dragon_list:
+    for dragon in dragon_list:
         for user_data in user_datas:
             if user_data.dragon_name == dragon.name:
                 break

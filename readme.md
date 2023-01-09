@@ -1,6 +1,6 @@
 <div align="center">
 
-# ayaka文字小游戏合集 - 0.5.7
+# ayaka文字小游戏合集 - 0.5.8b0
 
 基于[ayaka](https://github.com/bridgeL/nonebot-plugin-ayaka)开发的文字小游戏合集
 

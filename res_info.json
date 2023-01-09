@@ -1,0 +1,37 @@
+{
+    "base": "https://ghproxy.com/https://raw.githubusercontent.com/bridgeL/nonebot-plugin-ayaka-games/master/data/ayaka_games",
+    "items": [
+        {
+            "path": "24点/24.json",
+            "hash": "53618ebb24e82aafcf0e92e4d8052bf1"
+        },
+        {
+            "path": "24点/48.json",
+            "hash": "31d6664c6ac8f16696cf5b9c406e5684"
+        },
+        {
+            "path": "原神随机事件.json",
+            "hash": "4c9f8bec9416f81cc5e4bab03d9cd220"
+        },
+        {
+            "path": "成语词典.json",
+            "hash": "7c26d75685da1d850b7596f39891a5fd"
+        },
+        {
+            "path": "接龙/原神.txt",
+            "hash": "54b8d65ac0d8e719f33b2c094bfe1102"
+        },
+        {
+            "path": "接龙/成语.txt",
+            "hash": "439eab08a2bae91a26d9b80bc3cd1c54"
+        },
+        {
+            "path": "文字税.txt",
+            "hash": "5e5ecdc82ab9183c9d38a68cbc9f02c6"
+        },
+        {
+            "path": "谁是卧底.txt",
+            "hash": "f27cbb8f6f0e95919a7d0d77c9fde53c"
+        }
+    ]
+}

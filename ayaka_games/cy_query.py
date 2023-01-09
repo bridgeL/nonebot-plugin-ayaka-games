@@ -3,9 +3,9 @@
 '''
 from random import sample
 from nonebot import on_regex
-from ayaka import AyakaBox, AyakaConfig, slow_load_config, Field
+from ayaka import AyakaBox, load_data_from_file
 from nonebot.params import RegexGroup
-from .data import load_data
+from .data import downloader
 
 box = AyakaBox("成语查询")
 box.help = '''
@@ -14,16 +14,17 @@ box.help = '''
 数据来源：成语大全（20104条成语数据）
 '''
 
+search_dict = {}
 
-@slow_load_config
-class Config(AyakaConfig):
-    __config_name__ = box.name
-    words: dict = Field(default_factory=lambda: load_data("chengyu.json"))
+
+@downloader.on_finish
+async def finish():
+    global search_dict
+    path = downloader.BASE_DIR / "成语词典.json"
+    search_dict = load_data_from_file(path)
 
 
 async def show_word(word: str):
-    config = Config()
-    search_dict = config.words
     if word in search_dict:
         await box.send(search_dict[word])
     else:
@@ -48,14 +49,11 @@ async def handle_2(args: tuple = RegexGroup()):
 @box.on_cmd(cmds="搜索成语")
 async def handle_3():
     '''搜索所有相关的成语，可输入多个关键词更准确'''
-    config = Config()
     args = [arg for arg in box.args if isinstance(arg, str)]
 
     if not args:
         await box.send("没有输入关键词")
         return
-
-    search_dict = config.words
 
     words = []
     for _word in search_dict:
@@ -77,6 +75,6 @@ async def handle_3():
     if n > 100:
         infos.append("数量过多，仅展示随机抽取的100条")
         words = sample(words, 100)
-    if words:
-        infos.append("\n".join(words))
+    infos.append("\n".join(words))
+    infos.append("可以使用 查询成语 <成语> 来查看进一步解释")
     await box.send_many(infos)

@@ -1,19 +1,19 @@
 [tool.poetry]
 name = "nonebot_plugin_ayaka_games"
-version = "0.5.7"
+version = "0.5.8b0"
 description = "ayaka小游戏合集"
 authors = ["Su <wxlxy316@163.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/bridgeL/nonebot-plugin-ayaka-games"
 packages = [
-    { include = "ayaka_games", from = ".." },
+    { include = "ayaka_games" },
 ]
 
 
 [tool.poetry.dependencies]
 python = "^3.10"
-nonebot-plugin-ayaka = "~1.0.2"
+nonebot-plugin-ayaka = "~1.0.3b1"
 pypinyin = "^0.47.1"
 
 [build-system]

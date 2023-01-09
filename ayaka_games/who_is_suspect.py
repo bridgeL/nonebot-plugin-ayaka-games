@@ -2,19 +2,18 @@
     谁是卧底？
 '''
 from random import choice, randint
-from ayaka import AyakaBox, AyakaConfig, slow_load_config, get_user, Field
-from .data import load_data
+from ayaka import AyakaBox, get_user, load_data_from_file
+from .data import downloader
 
 
-def get_words():
-    items = load_data("suspect.txt")
-    return [item.split(" ") for item in items]
+words_list: list[tuple[str, str]] = []
 
 
-@slow_load_config
-class Config(AyakaConfig):
-    __config_name__ = "谁是卧底"
-    words: list[tuple[str, str]] = Field(default_factory=get_words)
+@downloader.on_finish
+async def get_words():
+    path = downloader.BASE_DIR / "谁是卧底.txt"
+    items = load_data_from_file(path)
+    words_list.extend(item.split(" ") for item in items)
 
 
 box = AyakaBox("谁是卧底")
@@ -133,7 +132,6 @@ class Game:
         return True, f"{p} 离开房间"
 
     def get_words(self):
-        words_list = Config().words
         normal, fake = choice(words_list)
 
         # # 有可能翻转
@@ -302,7 +300,7 @@ async def start():
     if not f:
         return
 
-    await box.set_state("play")
+    box.state = "play"
     for p in game.players:
         await box.bot.send_private_msg(user_id=p.uid, message=p.word)
 
@@ -365,5 +363,5 @@ async def vote():
     await box.send(info)
 
     # 返回房间
-    await box.set_state("room")
+    box.state = "room"
     await box.send("已回到房间，可发送start开始下一局")
