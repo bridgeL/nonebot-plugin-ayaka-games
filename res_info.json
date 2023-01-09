@@ -3,35 +3,35 @@
     "items": [
         {
             "path": "24点/24.json",
-            "hash": "53618ebb24e82aafcf0e92e4d8052bf1"
+            "hash": "4fa0f03e31558af86bfdf2a1100c48bb"
         },
         {
             "path": "24点/48.json",
-            "hash": "31d6664c6ac8f16696cf5b9c406e5684"
+            "hash": "268b56e0f3020d28b3cca018e1e91ccf"
         },
         {
             "path": "原神随机事件.json",
-            "hash": "4c9f8bec9416f81cc5e4bab03d9cd220"
+            "hash": "e096c2a13b34d4e3ad4e731fc67c9aac"
         },
         {
             "path": "成语词典.json",
-            "hash": "7c26d75685da1d850b7596f39891a5fd"
+            "hash": "4f2da2e2bfe86e72a3ff9da56f2a1ae9"
         },
         {
             "path": "接龙/原神.txt",
-            "hash": "54b8d65ac0d8e719f33b2c094bfe1102"
+            "hash": "c9aa278f281848ffa9f9da7bf1112434"
         },
         {
             "path": "接龙/成语.txt",
-            "hash": "439eab08a2bae91a26d9b80bc3cd1c54"
+            "hash": "0a72c4f25cdd923b0614a84920a8b85b"
         },
         {
             "path": "文字税.txt",
-            "hash": "5e5ecdc82ab9183c9d38a68cbc9f02c6"
+            "hash": "0bcd60bc03a1fe77562041758086feef"
         },
         {
             "path": "谁是卧底.txt",
-            "hash": "f27cbb8f6f0e95919a7d0d77c9fde53c"
+            "hash": "76ff038d61ecb9aaae64217f0f85ea10"
         }
     ]
 }

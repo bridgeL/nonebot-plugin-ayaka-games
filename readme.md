@@ -13,3 +13,7 @@
 ## 文档
 
 https://bridgel.github.io/ayaka_doc/latest/games/game/
+
+## 踩坑
+
+CRLF换行符的文件，会在github上被强制换为LF换行符再发放，这会导致文件哈希值变化
